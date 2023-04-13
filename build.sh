@@ -146,7 +146,7 @@ for target in "${targets[@]}"; do
 		patchelf --set-soname 'libc.so' './libc.so'
 	fi
 	
-	if [ -f "${ld}" ]; then
+	if [ -L "${ld}" ]; then
 		unlink "${ld}"
 	fi
 	
