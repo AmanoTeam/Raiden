@@ -153,7 +153,7 @@ for target in "${targets[@]}"; do
 	ln --symbolic './libc.so' "${ld}"
 	
 	while read filename; do
-		if [[ "${filename}" =~ ^lib(pthread|resolv|rt|c|m|util|xnet|crypt)\.(so|a)$ || "${filename}" =~ ^.*\.o$ || "${filename}" =~ ^ld\-.*\.so.*$ ]]; then
+		if [[ "${filename}" =~ ^lib(pthread|resolv|rt|c|m|util|xnet)\.(so|a)$ || "${filename}" =~ ^.*\.o$ || "${filename}" =~ ^ld\-.*\.so.*$ ]]; then
 			continue
 		fi
 		

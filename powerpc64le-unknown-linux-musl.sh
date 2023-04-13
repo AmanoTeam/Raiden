@@ -1,8 +1,8 @@
 #!/bin/bash
 
 declare packages=(
-	'https://dl-3.alpinelinux.org/alpine/edge/main/ppc64le/musl-1.2.3_git20230322-r0.apk'
-	'https://dl-3.alpinelinux.org/alpine/edge/main/ppc64le/musl-dev-1.2.3_git20230322-r0.apk'
+	'https://dl-3.alpinelinux.org/alpine/edge/main/ppc64le/musl-1.2.3_git20230322-r3.apk'
+	'https://dl-3.alpinelinux.org/alpine/edge/main/ppc64le/musl-dev-1.2.3_git20230322-r3.apk'
 	'https://dl-3.alpinelinux.org/alpine/edge/main/ppc64le/linux-headers-6.2-r0.apk'
 )
 
