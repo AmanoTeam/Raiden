@@ -1,12 +1,12 @@
 #!/bin/bash
 
-set -e
-set -u
+set -eu
 
 declare -r current_source_directory="${PWD}"
 
-declare -r toolchain_directory='/tmp/unknown-unknown-musl'
-declare -r toolchain_tarball="$(pwd)/musl-cross.tar.xz"
+declare -r revision="$(git rev-parse --short HEAD)"
+
+declare -r toolchain_directory='/tmp/raiden'
 
 declare -r gmp_tarball='/tmp/gmp.tar.xz'
 declare -r gmp_directory='/tmp/gmp-6.2.1'
@@ -22,6 +22,11 @@ declare -r binutils_directory='/tmp/binutils-2.40'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
 declare -r gcc_directory='/tmp/gcc-12.2.0'
+
+declare -r optflags='-Os'
+declare -r linkflags='-Wl,-s'
+
+source "./submodules/obggcc/toolchains/${1}.sh"
 
 if ! [ -f "${gmp_tarball}" ]; then
 	wget --no-verbose 'https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.xz' --output-document="${gmp_tarball}"
@@ -48,20 +53,22 @@ if ! [ -f "${gcc_tarball}" ]; then
 	tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
 fi
 
-while read file; do
-	sed -i 's/-O2/-Os -s -DNDEBUG/g' "${file}"
-done <<< "$(find '/tmp' -type 'f' -wholename '*configure')"
+sed --in-place 's/LDBL_MANT_DIG == 106/defined(__powerpc64__)/g' "${gcc_directory}/libgcc/dfp-bit.h"
 
 [ -d "${gmp_directory}/build" ] || mkdir "${gmp_directory}/build"
 
 cd "${gmp_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static
+	--enable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
-make all --jobs="$(nproc)"
+make all --jobs
 make install
 
 [ -d "${mpfr_directory}/build" ] || mkdir "${mpfr_directory}/build"
@@ -69,12 +76,16 @@ make install
 cd "${mpfr_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static
+	--enable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
-make all --jobs="$(nproc)"
+make all --jobs
 make install
 
 [ -d "${mpc_directory}/build" ] || mkdir "${mpc_directory}/build"
@@ -82,20 +93,24 @@ make install
 cd "${mpc_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static
+	--enable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
-make all --jobs="$(nproc)"
+make all --jobs
 make install
 
 declare -ra targets=(
+	'powerpc64le-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
 	'aarch64-unknown-linux-musl'
 	'armv7l-unknown-linux-musleabihf'
 	'arm-unknown-linux-musleabihf'
-	'powerpc64le-unknown-linux-musl'
 	'riscv64-unknown-linux-musl'
 	's390x-unknown-linux-musl'
 	'i386-unknown-linux-musl'
@@ -166,12 +181,19 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
+		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triple}" \
 		--prefix="${toolchain_directory}" \
 		--enable-gold \
-		--enable-ld
+		--enable-ld \
+		--enable-lto \
+		--disable-gprofng \
+		--with-static-standard-libraries \
+		CFLAGS="${optflags}" \
+		CXXFLAGS="${optflags}" \
+		LDFLAGS="${linkflags}"
 	
-	make all --jobs="$(nproc)"
+	make all --jobs="$(($(nproc) * 8))"
 	make install
 	
 	[ -d "${gcc_directory}/build" ] || mkdir "${gcc_directory}/build"
@@ -181,14 +203,14 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
+		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triple}" \
 		--prefix="${toolchain_directory}" \
 		--with-linker-hash-style='gnu' \
 		--with-gmp="${toolchain_directory}" \
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
-		--with-system-zlib \
-		--with-bugurl='https://github.com/AmanoTeam/muslcr00s/issues' \
+		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
 		--enable-__cxa_atexit \
 		--enable-cet='auto' \
 		--enable-checking='release' \
@@ -218,14 +240,34 @@ for target in "${targets[@]}"; do
 		--enable-ld \
 		--enable-gold \
 		--with-pic \
+		--with-pkgversion="Raiden v0.2-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triple}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
+		--disable-nls \
+		${extra_configure_flags} \
 		libat_cv_have_ifunc=no \
-		${extra_configure_flags}
+		CFLAGS="${optflags}" \
+		CXXFLAGS="${optflags}" \
+		LDFLAGS="-Wl,-rpath-link,${OBGGCC_TOOLCHAIN}/${CROSS_COMPILE_TRIPLET}/lib ${linkflags}"
 	
-	LD_LIBRARY_PATH="${toolchain_directory}/lib" PATH="${PATH}:${toolchain_directory}/bin" make all --jobs="$(nproc)"
+	LD_LIBRARY_PATH="${toolchain_directory}/lib" PATH="${PATH}:${toolchain_directory}/bin" make \
+		CFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
+		CXXFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
+		all --jobs="$(($(nproc) * 8))"
 	make install
+	
+	cd "${toolchain_directory}/${triple}/bin"
+	
+	for name in *; do
+		rm "${name}"
+		ln -s "../../bin/${triple}-${name}" "${name}"
+	done
+	
+	rm --recursive "${toolchain_directory}/share"
+	rm --recursive "${toolchain_directory}/lib/gcc/${triple}/12/include-fixed"
+	
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/cc1"
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/cc1plus"
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/lto1"
 done
-
-tar --directory="$(dirname "${toolchain_directory}")" --create --file=- "$(basename "${toolchain_directory}")" |  xz --threads=0 --compress -9 > "${toolchain_tarball}"
