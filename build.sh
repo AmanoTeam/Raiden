@@ -20,13 +20,35 @@ declare -r mpc_directory='/tmp/mpc-1.3.1'
 declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils-2.40'
 
-declare -r gcc_tarball='/tmp/gcc.tar.xz'
-declare -r gcc_directory='/tmp/gcc-12.2.0'
+declare -r gcc_tarball='/tmp/gcc.tar.gz'
+declare -r gcc_directory='/tmp/gcc-master'
 
 declare -r optflags='-Os'
 declare -r linkflags='-Wl,-s'
 
-source "./submodules/obggcc/toolchains/${1}.sh"
+declare -r max_jobs="$(($(nproc) * 8))"
+
+declare build_type="${1}"
+
+if [ -z "${build_type}" ]; then
+	build_type='native'
+fi
+
+declare is_native='0'
+
+if [ "${build_type}" == 'native' ]; then
+	is_native='1'
+fi
+
+declare OBGGCC_TOOLCHAIN='/tmp/obggcc-toolchain'
+declare CROSS_COMPILE_TRIPLET=''
+
+declare cross_compile_flags=''
+
+if ! (( is_native )); then
+	source "./submodules/obggcc/toolchains/${build_type}.sh"
+	cross_compile_flags+="--host=${CROSS_COMPILE_TRIPLET}"
+fi
 
 if ! [ -f "${gmp_tarball}" ]; then
 	wget --no-verbose 'https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.xz' --output-document="${gmp_tarball}"
@@ -49,7 +71,7 @@ if ! [ -f "${binutils_tarball}" ]; then
 fi
 
 if ! [ -f "${gcc_tarball}" ]; then
-	wget --no-verbose 'https://mirrors.kernel.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0.tar.xz' --output-document="${gcc_tarball}"
+	wget --no-verbose 'https://codeload.github.com/gcc-mirror/gcc/tar.gz/refs/heads/master' --output-document="${gcc_tarball}"
 	tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
 fi
 
@@ -60,10 +82,10 @@ sed --in-place 's/LDBL_MANT_DIG == 106/defined(__powerpc64__)/g' "${gcc_director
 cd "${gmp_directory}/build"
 
 ../configure \
-	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
+	${cross_compile_flags} \
 	CFLAGS="${optflags}" \
 	CXXFLAGS="${optflags}" \
 	LDFLAGS="${linkflags}"
@@ -76,11 +98,11 @@ make install
 cd "${mpfr_directory}/build"
 
 ../configure \
-	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
+	${cross_compile_flags} \
 	CFLAGS="${optflags}" \
 	CXXFLAGS="${optflags}" \
 	LDFLAGS="${linkflags}"
@@ -93,11 +115,11 @@ make install
 cd "${mpc_directory}/build"
 
 ../configure \
-	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
+	${cross_compile_flags} \
 	CFLAGS="${optflags}" \
 	CXXFLAGS="${optflags}" \
 	LDFLAGS="${linkflags}"
@@ -106,10 +128,10 @@ make all --jobs
 make install
 
 declare -ra targets=(
+	'armv7l-unknown-linux-musleabihf'
 	'powerpc64le-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
 	'aarch64-unknown-linux-musl'
-	'armv7l-unknown-linux-musleabihf'
 	'arm-unknown-linux-musleabihf'
 	'riscv64-unknown-linux-musl'
 	's390x-unknown-linux-musl'
@@ -141,16 +163,16 @@ for target in "${targets[@]}"; do
 		tar --extract --file="${package_filename}"
 	done
 	
-	[ -d "${toolchain_directory}/${triple}" ] || mkdir --parent "${toolchain_directory}/${triple}"
+	[ -d "${toolchain_directory}/${triplet}" ] || mkdir --parent "${toolchain_directory}/${triplet}"
 	
-	mv './usr/include' "${toolchain_directory}/${triple}"
-	mv './usr/lib' "${toolchain_directory}/${triple}"
+	cp --recursive './usr/include' "${toolchain_directory}/${triplet}"
+	cp --recursive './usr/lib' "${toolchain_directory}/${triplet}"
 	
 	if [ -d './lib' ]; then
-		mv './lib/'* "${toolchain_directory}/${triple}/lib"
+		cp --remove-destination --recursive './lib/'* "${toolchain_directory}/${triplet}/lib"
 	fi
 	
-	pushd "${toolchain_directory}/${triple}/lib"
+	pushd "${toolchain_directory}/${triplet}/lib"
 	
 	if [ "${os}" == 'alpine' ]; then
 		find . -xtype l | xargs ls -l | grep '/lib/' | awk '{print "unlink "$9" && ln -s $(basename "$11") $(basename "$9")"}' | bash
@@ -181,19 +203,19 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
-		--host="${CROSS_COMPILE_TRIPLET}" \
-		--target="${triple}" \
+		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
 		--enable-gold \
 		--enable-ld \
 		--enable-lto \
 		--disable-gprofng \
 		--with-static-standard-libraries \
+		${cross_compile_flags} \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
 		LDFLAGS="${linkflags}"
 	
-	make all --jobs="$(($(nproc) * 8))"
+	make all --jobs="${max_jobs}"
 	make install
 	
 	[ -d "${gcc_directory}/build" ] || mkdir "${gcc_directory}/build"
@@ -203,49 +225,48 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
-		--host="${CROSS_COMPILE_TRIPLET}" \
-		--target="${triple}" \
+		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
 		--with-linker-hash-style='gnu' \
 		--with-gmp="${toolchain_directory}" \
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
+		--with-pkgversion="Raiden v0.3-${revision}" \
+		--with-sysroot="${toolchain_directory}/${triplet}" \
+		--with-gcc-major-version-only \
+		--with-native-system-header-dir='/include' \
 		--enable-__cxa_atexit \
 		--enable-cet='auto' \
 		--enable-checking='release' \
 		--enable-clocale='gnu' \
 		--enable-default-ssp \
 		--enable-gnu-indirect-function \
-		--disable-gnu-unique-object \
-		--disable-libsanitizer \
-		--disable-symvers \
-		--disable-sjlj-exceptions \
-		--disable-target-libiberty \
 		--enable-libssp \
 		--enable-libstdcxx-backtrace \
 		--enable-link-serialization='1' \
 		--enable-linker-build-id \
 		--enable-lto \
-		--disable-multilib \
 		--enable-plugin \
 		--enable-shared \
 		--enable-threads='posix' \
-		--disable-libstdcxx-pch \
-		--disable-werror \
-		--enable-languages='c,c++' \
-		--disable-libgomp \
-		--disable-bootstrap \
-		--without-headers \
 		--enable-ld \
 		--enable-gold \
-		--with-pic \
-		--with-pkgversion="Raiden v0.2-${revision}" \
-		--with-sysroot="${toolchain_directory}/${triple}" \
-		--with-gcc-major-version-only \
-		--with-native-system-header-dir='/include' \
+		--enable-languages='c,c++' \
+		--disable-gnu-unique-object \
+		--disable-libsanitizer \
+		--disable-symvers \
+		--disable-sjlj-exceptions \
+		--disable-target-libiberty \
+		--disable-multilib \
+		--disable-werror \
+		--disable-libgomp \
+		--disable-bootstrap \
+		--disable-libstdcxx-pch \
 		--disable-nls \
+		--without-headers \
 		${extra_configure_flags} \
+		${cross_compile_flags} \
 		libat_cv_have_ifunc=no \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
@@ -254,20 +275,20 @@ for target in "${targets[@]}"; do
 	LD_LIBRARY_PATH="${toolchain_directory}/lib" PATH="${PATH}:${toolchain_directory}/bin" make \
 		CFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
 		CXXFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
-		all --jobs="$(($(nproc) * 8))"
+		all --jobs="${max_jobs}"
 	make install
 	
-	cd "${toolchain_directory}/${triple}/bin"
+	cd "${toolchain_directory}/${triplet}/bin"
 	
 	for name in *; do
 		rm "${name}"
-		ln -s "../../bin/${triple}-${name}" "${name}"
+		ln -s "../../bin/${triplet}-${name}" "${name}"
 	done
 	
 	rm --recursive "${toolchain_directory}/share"
-	rm --recursive "${toolchain_directory}/lib/gcc/${triple}/12/include-fixed"
+	rm --recursive "${toolchain_directory}/lib/gcc/${triplet}/"*"/include-fixed"
 	
-	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/cc1"
-	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/cc1plus"
-	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triple}/12/lto1"
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1"
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1plus"
+	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/lto1"
 done
