@@ -128,6 +128,7 @@ make all --jobs
 make install
 
 declare -ra targets=(
+	'mips64-unknown-linux-musl'
 	'armv7l-unknown-linux-musleabihf'
 	'powerpc64le-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'

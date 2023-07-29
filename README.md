@@ -14,6 +14,7 @@ We currently build cross-compilers targeting many Linux architectures. See above
 * `riscv64-unknown-linux-musl`
 * `s390x-unknown-linux-musl`
 * `x86_64-unknown-linux-musl`
+* `mips64-unknown-linux-musl`
 
 ## Releases
 
