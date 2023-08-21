@@ -15,7 +15,7 @@ declare -r RAIDEN_CROSS_TAG="$(jq --raw-output '.tag_name' <<< "$(curl --retry 1
 declare -r RAIDEN_CROSS_TARBALL='/tmp/raiden.tar.xz'
 declare -r RAIDEN_CROSS_URL="https://github.com/AmanoTeam/Raiden/releases/download/${RAIDEN_CROSS_TAG}/x86_64-unknown-linux-gnu.tar.xz"
 
-curl --retry 10 --retry-delay 3 --silent --location --url "${RAIDEN_CROSS_URL}" --output "${RAIDEN_CROSS_TARBALL}"
+curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --url "${RAIDEN_CROSS_URL}" --output "${RAIDEN_CROSS_TARBALL}"
 tar --directory="$(dirname "${RAIDEN_CROSS_TARBALL}")" --extract --file="${RAIDEN_CROSS_TARBALL}"
 
 rm "${RAIDEN_CROSS_TARBALL}"

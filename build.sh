@@ -21,7 +21,7 @@ declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils-2.40'
 
 declare -r gcc_tarball='/tmp/gcc.tar.gz'
-declare -r gcc_directory='/tmp/gcc-master'
+declare -r gcc_directory='/tmp/gcc-13.2.0'
 
 declare -r optflags='-Os'
 declare -r linkflags='-Wl,-s'
@@ -51,27 +51,27 @@ if ! (( is_native )); then
 fi
 
 if ! [ -f "${gmp_tarball}" ]; then
-	wget --no-verbose 'https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.xz' --output-document="${gmp_tarball}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.xz' --output "${gmp_tarball}"
 	tar --directory="$(dirname "${gmp_directory}")" --extract --file="${gmp_tarball}"
 fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
-	wget --no-verbose 'https://mirrors.kernel.org/gnu/mpfr/mpfr-4.2.0.tar.xz' --output-document="${mpfr_tarball}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/mpfr/mpfr-4.2.0.tar.xz' --output "${mpfr_tarball}"
 	tar --directory="$(dirname "${mpfr_directory}")" --extract --file="${mpfr_tarball}"
 fi
 
 if ! [ -f "${mpc_tarball}" ]; then
-	wget --no-verbose 'https://mirrors.kernel.org/gnu/mpc/mpc-1.3.1.tar.gz' --output-document="${mpc_tarball}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/mpc/mpc-1.3.1.tar.gz' --output "${mpc_tarball}"
 	tar --directory="$(dirname "${mpc_directory}")" --extract --file="${mpc_tarball}"
 fi
 
 if ! [ -f "${binutils_tarball}" ]; then
-	wget --no-verbose 'https://mirrors.kernel.org/gnu/binutils/binutils-2.40.tar.xz' --output-document="${binutils_tarball}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/binutils/binutils-2.40.tar.xz' --output "${binutils_tarball}"
 	tar --directory="$(dirname "${binutils_directory}")" --extract --file="${binutils_tarball}"
 fi
 
 if ! [ -f "${gcc_tarball}" ]; then
-	wget --no-verbose 'https://codeload.github.com/gcc-mirror/gcc/tar.gz/refs/heads/master' --output-document="${gcc_tarball}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz' --output "${gcc_tarball}"
 	tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
 fi
 
@@ -150,7 +150,8 @@ for target in "${targets[@]}"; do
 		declare sysroot_filename="./sysroot.tar.gz"
 	fi
 	
-	wget --no-verbose "${sysroot}" --output-document="${sysroot_filename}"
+	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --output "${sysroot_filename}" --url "${sysroot}"
+	
 	tar --extract --file="${sysroot_filename}" || true
 	
 	if [ "${os}" == 'void' ]; then
@@ -160,7 +161,7 @@ for target in "${targets[@]}"; do
 	fi
 	
 	for package in "${packages[@]}"; do
-		wget --no-verbose "${package}" --output-document="${package_filename}"
+		curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --output "${package_filename}" --url "${package}"
 		tar --extract --file="${package_filename}"
 	done
 	
@@ -211,6 +212,7 @@ for target in "${targets[@]}"; do
 		--enable-lto \
 		--disable-gprofng \
 		--with-static-standard-libraries \
+		--with-sysroot="${toolchain_directory}/${triplet}" \
 		${cross_compile_flags} \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
@@ -233,7 +235,7 @@ for target in "${targets[@]}"; do
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v0.3-${revision}" \
+		--with-pkgversion="Raiden v0.4-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
