@@ -2,31 +2,63 @@
 
 set -eu
 
-declare -r current_source_directory="${PWD}"
+declare -r workdir="${PWD}"
 
 declare -r revision="$(git rev-parse --short HEAD)"
 
 declare -r toolchain_directory='/tmp/raiden'
 
 declare -r gmp_tarball='/tmp/gmp.tar.xz'
-declare -r gmp_directory='/tmp/gmp-6.2.1'
+declare -r gmp_directory='/tmp/gmp-6.3.0'
 
 declare -r mpfr_tarball='/tmp/mpfr.tar.xz'
-declare -r mpfr_directory='/tmp/mpfr-4.2.0'
+declare -r mpfr_directory='/tmp/mpfr-4.2.1'
 
 declare -r mpc_tarball='/tmp/mpc.tar.gz'
 declare -r mpc_directory='/tmp/mpc-1.3.1'
 
 declare -r binutils_tarball='/tmp/binutils.tar.xz'
-declare -r binutils_directory='/tmp/binutils-2.40'
+declare -r binutils_directory='/tmp/binutils-2.42'
 
-declare -r gcc_tarball='/tmp/gcc.tar.gz'
-declare -r gcc_directory='/tmp/gcc-13.2.0'
+declare gcc_directory=''
+
+declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
+
+function setup_gcc_source() {
+	
+	local gcc_version=''
+	local gcc_url=''
+	local gcc_tarball=''
+	local tgt="${1}"
+	
+	declare -r tgt
+	
+	gcc_version='14'
+	gcc_directory='/tmp/gcc-14.1.0'
+	gcc_url='https://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.xz'
+	
+	gcc_tarball="/tmp/gcc-${gcc_version}.tar.xz"
+	
+	declare -r gcc_version
+	declare -r gcc_url
+	declare -r gcc_tarball
+	
+	if ! [ -f "${gcc_tarball}" ]; then
+		wget --no-verbose "${gcc_url}" --output-document="${gcc_tarball}"
+		tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
+	fi
+	
+	[ -d "${gcc_directory}/build" ] || mkdir "${gcc_directory}/build"
+	
+	sed --in-place 's/LDBL_MANT_DIG == 113/defined(__powerpc__) || defined(__powerpc64__) || defined(__s390x__)/g' "${gcc_directory}/libgcc/dfp-bit.h"
+	sed --in-place 's/soft-fp.h/this-does-not-exist.h/g' "${gcc_directory}/libquadmath/math/sqrtq.c"
+	
+}
 
 declare -r optflags='-Os'
 declare -r linkflags='-Wl,-s'
 
-declare -r max_jobs="$(($(nproc) * 8))"
+declare -r max_jobs="$(($(nproc) * 17))"
 
 declare build_type="${1}"
 
@@ -51,31 +83,26 @@ if ! (( is_native )); then
 fi
 
 if ! [ -f "${gmp_tarball}" ]; then
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.xz' --output "${gmp_tarball}"
+	wget --no-verbose 'https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz' --output-document="${gmp_tarball}"
 	tar --directory="$(dirname "${gmp_directory}")" --extract --file="${gmp_tarball}"
 fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/mpfr/mpfr-4.2.0.tar.xz' --output "${mpfr_tarball}"
+	wget --no-verbose 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' --output-document="${mpfr_tarball}"
 	tar --directory="$(dirname "${mpfr_directory}")" --extract --file="${mpfr_tarball}"
 fi
 
 if ! [ -f "${mpc_tarball}" ]; then
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/mpc/mpc-1.3.1.tar.gz' --output "${mpc_tarball}"
+	wget --no-verbose 'https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz' --output-document="${mpc_tarball}"
 	tar --directory="$(dirname "${mpc_directory}")" --extract --file="${mpc_tarball}"
 fi
 
 if ! [ -f "${binutils_tarball}" ]; then
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/binutils/binutils-2.40.tar.xz' --output "${binutils_tarball}"
+	wget --no-verbose 'https://ftp.gnu.org/gnu/binutils/binutils-2.42.tar.xz' --output-document="${binutils_tarball}"
 	tar --directory="$(dirname "${binutils_directory}")" --extract --file="${binutils_tarball}"
+	
+	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/patches/0001-Revert-gold-Use-char16_t-char32_t-instead-of-uint16_.patch"
 fi
-
-if ! [ -f "${gcc_tarball}" ]; then
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://mirrors.kernel.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz' --output "${gcc_tarball}"
-	tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
-fi
-
-sed --in-place 's/LDBL_MANT_DIG == 106/defined(__powerpc64__)/g' "${gcc_directory}/libgcc/dfp-bit.h"
 
 [ -d "${gmp_directory}/build" ] || mkdir "${gmp_directory}/build"
 
@@ -120,7 +147,7 @@ cd "${mpc_directory}/build"
 	--enable-shared \
 	--enable-static \
 	${cross_compile_flags} \
-	CFLAGS="${optflags}" \
+	CFLAGS="${optflags} -fpermissive" \
 	CXXFLAGS="${optflags}" \
 	LDFLAGS="${linkflags}"
 
@@ -128,76 +155,38 @@ make all --jobs
 make install
 
 declare -ra targets=(
+	# 'powerpc-unknown-linux-musl'
+	's390x-unknown-linux-musl'
+	'powerpc64le-unknown-linux-musl'
+	# 'mips-unknown-linux-musl'
+	# 'mipsel-unknown-linux-musl'
 	'mips64-unknown-linux-musl'
 	'armv7l-unknown-linux-musleabihf'
-	'powerpc64le-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
 	'aarch64-unknown-linux-musl'
 	'arm-unknown-linux-musleabihf'
 	'riscv64-unknown-linux-musl'
-	's390x-unknown-linux-musl'
 	'i386-unknown-linux-musl'
 )
 
 for target in "${targets[@]}"; do
-	source "${current_source_directory}/${target}.sh"
+	source "${workdir}/${target}.sh"
 	
 	cd "$(mktemp --directory)"
 	
-	if [ "${os}" == 'void' ]; then
-		declare sysroot_filename="./sysroot.tar.xz"
-	else
-		declare sysroot_filename="./sysroot.tar.gz"
-	fi
+	curl \
+		--url "https://github.com/AmanoTeam/musl-sysroot/releases/latest/download/${triplet}.tar.xz" \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--continue-at '-' \
+		--output "${sysroot_tarball}"
 	
-	curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --output "${sysroot_filename}" --url "${sysroot}"
+	tar --directory="${toolchain_directory}" --extract --file="${sysroot_tarball}"
 	
-	tar --extract --file="${sysroot_filename}" || true
-	
-	if [ "${os}" == 'void' ]; then
-		declare package_filename="./package.tar.xst"
-	else
-		declare package_filename="./package.tar.gz"
-	fi
-	
-	for package in "${packages[@]}"; do
-		curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --output "${package_filename}" --url "${package}"
-		tar --extract --file="${package_filename}"
-	done
-	
-	[ -d "${toolchain_directory}/${triplet}" ] || mkdir --parent "${toolchain_directory}/${triplet}"
-	
-	cp --recursive './usr/include' "${toolchain_directory}/${triplet}"
-	cp --recursive './usr/lib' "${toolchain_directory}/${triplet}"
-	
-	if [ -d './lib' ]; then
-		cp --remove-destination --recursive './lib/'* "${toolchain_directory}/${triplet}/lib"
-	fi
-	
-	pushd "${toolchain_directory}/${triplet}/lib"
-	
-	if [ "${os}" == 'alpine' ]; then
-		find . -xtype l | xargs ls -l | grep '/lib/' | awk '{print "unlink "$9" && ln -s $(basename "$11") $(basename "$9")"}' | bash
-		
-		unlink './libc.so'
-		mv "${ld}" './libc.so'
-		
-		patchelf --set-soname 'libc.so' './libc.so'
-	fi
-	
-	if [ -L "${ld}" ]; then
-		unlink "${ld}"
-	fi
-	
-	ln --symbolic './libc.so' "${ld}"
-	
-	while read filename; do
-		if [[ "${filename}" =~ ^lib(pthread|resolv|rt|c|m|util|xnet)\.(so|a)$ || "${filename}" =~ ^.*\.o$ || "${filename}" =~ ^ld\-.*\.so.*$ ]]; then
-			continue
-		fi
-		
-		rm --recursive "${filename}"
-	done <<< "$(ls)"
+	unlink "${sysroot_tarball}"
 	
 	[ -d "${binutils_directory}/build" ] || mkdir "${binutils_directory}/build"
 	
@@ -218,8 +207,10 @@ for target in "${targets[@]}"; do
 		CXXFLAGS="${optflags}" \
 		LDFLAGS="${linkflags}"
 	
-	make all --jobs="${max_jobs}"
+	make all --jobs
 	make install
+	
+	setup_gcc_source "${triplet}"
 	
 	[ -d "${gcc_directory}/build" ] || mkdir "${gcc_directory}/build"
 	
@@ -235,7 +226,7 @@ for target in "${targets[@]}"; do
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v0.4-${revision}" \
+		--with-pkgversion="Raiden v0.5-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -285,7 +276,7 @@ for target in "${targets[@]}"; do
 	
 	for name in *; do
 		rm "${name}"
-		ln -s "../../bin/${triplet}-${name}" "${name}"
+		ln --symbolic "../../bin/${triplet}-${name}" "${name}"
 	done
 	
 	rm --recursive "${toolchain_directory}/share"
