@@ -1,0 +1,25 @@
+From 8935150cb28bc218249ea11f17093d0f1a9c1311 Mon Sep 17 00:00:00 2001
+From: Kartatz <105828205+Kartatz@users.noreply.github.com>
+Date: Fri, 14 Feb 2025 02:05:07 +0100
+Subject: [PATCH] Fix libgcc build on musl
+
+---
+ libgcc/dfp-bit.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libgcc/dfp-bit.h b/libgcc/dfp-bit.h
+index 0468ea1..cbc271b 100644
+--- a/libgcc/dfp-bit.h
++++ b/libgcc/dfp-bit.h
+@@ -288,7 +288,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ #elif LDBL_MANT_DIG == 113
+ #define BFP_FMT "%.36Le"
+ #else
+-#error "unknown long double size, cannot define BFP_FMT"
++#define BFP_FMT "%Le"
+ #endif /* LDBL_MANT_DIG */
+ #define STR_TO_BFP strtold
+ #define BFP_VIA_TYPE long double
+-- 
+2.36.6
+
