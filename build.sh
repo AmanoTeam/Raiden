@@ -26,10 +26,25 @@ declare -r gcc_directory='/tmp/gcc-master'
 
 declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
-declare -r optflags='-w -Os'
+declare -r max_jobs='40'
+
+declare -r optlto="-flto=${max_jobs} -fno-fat-lto-objects"
+declare -r optfatlto="-flto=${max_jobs} -ffat-lto-objects"
+
+declare -r optflags='-w -O2'
 declare -r linkflags='-Wl,-s'
 
-declare -r max_jobs="$(($(nproc) * 10))"
+declare -ra targets=(
+	'powerpc64le-unknown-linux-musl'
+	's390x-unknown-linux-musl'
+	'arm-unknown-linux-musleabihf'
+	'armv7l-unknown-linux-musleabihf'
+	'mips64-unknown-linux-musl'
+	'x86_64-unknown-linux-musl'
+	'aarch64-unknown-linux-musl'
+	'riscv64-unknown-linux-musl'
+	'i386-unknown-linux-musl'
+)
 
 declare build_type="${1}"
 
@@ -43,50 +58,110 @@ if [ "${build_type}" == 'native' ]; then
 	is_native='1'
 fi
 
-declare OBGGCC_TOOLCHAIN='/tmp/obggcc-toolchain'
 declare CROSS_COMPILE_TRIPLET=''
-
-declare cross_compile_flags=''
 
 if ! (( is_native )); then
 	source "./submodules/obggcc/toolchains/${build_type}.sh"
-	cross_compile_flags+="--host=${CROSS_COMPILE_TRIPLET}"
 fi
 
+declare -r \
+	build_type \
+	is_native
+
 if ! [ -f "${gmp_tarball}" ]; then
-	wget --no-verbose 'https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz' --output-document="${gmp_tarball}"
-	tar --directory="$(dirname "${gmp_directory}")" --extract --file="${gmp_tarball}"
+	curl \
+		--url 'https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${gmp_tarball}"
+	
+	tar \
+		--directory="$(dirname "${gmp_directory}")" \
+		--extract \
+		--file="${gmp_tarball}"
 fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
-	wget --no-verbose 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' --output-document="${mpfr_tarball}"
-	tar --directory="$(dirname "${mpfr_directory}")" --extract --file="${mpfr_tarball}"
+	curl \
+		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${mpfr_tarball}"
+	
+	tar \
+		--directory="$(dirname "${mpfr_directory}")" \
+		--extract \
+		--file="${mpfr_tarball}"
 fi
 
 if ! [ -f "${mpc_tarball}" ]; then
-	wget --no-verbose 'https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz' --output-document="${mpc_tarball}"
-	tar --directory="$(dirname "${mpc_directory}")" --extract --file="${mpc_tarball}"
+	curl \
+		--url 'https://ftp.gnu.org/gnu/mpc/mpc-1.3.1.tar.gz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${mpc_tarball}"
+	
+	tar \
+		--directory="$(dirname "${mpc_directory}")" \
+		--extract \
+		--file="${mpc_tarball}"
 fi
 
 if ! [ -f "${binutils_tarball}" ]; then
-	wget --no-verbose 'https://ftp.gnu.org/gnu/binutils/binutils-with-gold-2.44.tar.xz' --output-document="${binutils_tarball}"
-	tar --directory="$(dirname "${binutils_directory}")" --extract --file="${binutils_tarball}"
+	curl \
+		--url 'https://ftp.gnu.org/gnu/binutils/binutils-with-gold-2.44.tar.xz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${binutils_tarball}"
+	
+	tar \
+		--directory="$(dirname "${binutils_directory}")" \
+		--extract \
+		--file="${binutils_tarball}"
 	
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Revert-gold-Use-char16_t-char32_t-instead-of-uint16_.patch"
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Disable-annoying-linker-warnings.patch"
 fi
 
 if ! [ -f "${gcc_tarball}" ]; then
-	wget --no-verbose 'https://github.com/gcc-mirror/gcc/archive/refs/heads/master.tar.gz' --output-document="${gcc_tarball}"
-	tar --directory="$(dirname "${gcc_directory}")" --extract --file="${gcc_tarball}"
+	curl \
+		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/master.tar.gz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${gcc_tarball}"
+	
+	tar \
+		--directory="$(dirname "${gcc_directory}")" \
+		--extract \
+		--file="${gcc_tarball}"
+	
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libgcc-build-on-musl.patch"
 	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Fix-libgcc-build-on-arm.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Change-the-default-language-version-for-C-compilatio.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wimplicit-int-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wint-conversion-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Revert-GCC-change-about-turning-Wimplicit-function-d.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libgcc-build-on-musl.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libquadmath-build-on-musl.patch"
 fi
 
 [ -d "${gmp_directory}/build" ] || mkdir "${gmp_directory}/build"
@@ -94,13 +169,13 @@ fi
 cd "${gmp_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
-	${cross_compile_flags} \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
-	LDFLAGS="${linkflags}"
+	CFLAGS="${optflags} ${optlto}" \
+	CXXFLAGS="${optflags} ${optlto}" \
+	LDFLAGS="${linkflags} ${optlto}"
 
 make all --jobs
 make install
@@ -110,14 +185,14 @@ make install
 cd "${mpfr_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
-	${cross_compile_flags} \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
-	LDFLAGS="${linkflags}"
+	CFLAGS="${optflags} ${optlto}" \
+	CXXFLAGS="${optflags} ${optlto}" \
+	LDFLAGS="${linkflags} ${optlto}"
 
 make all --jobs
 make install
@@ -127,29 +202,17 @@ make install
 cd "${mpc_directory}/build"
 
 ../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--enable-static \
-	${cross_compile_flags} \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
-	LDFLAGS="${linkflags}"
+	CFLAGS="${optflags} ${optlto}" \
+	CXXFLAGS="${optflags} ${optlto}" \
+	LDFLAGS="${linkflags} ${optlto}"
 
 make all --jobs
 make install
-
-declare -ra targets=(
-	'arm-unknown-linux-musleabihf'
-	'armv7l-unknown-linux-musleabihf'
-	'powerpc64le-unknown-linux-musl'
-	's390x-unknown-linux-musl'
-	'mips64-unknown-linux-musl'
-	'x86_64-unknown-linux-musl'
-	'aarch64-unknown-linux-musl'
-	'riscv64-unknown-linux-musl'
-	'i386-unknown-linux-musl'
-)
 
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
@@ -163,10 +226,12 @@ for target in "${targets[@]}"; do
 		--retry-delay '0' \
 		--retry-max-time '0' \
 		--location \
-		--continue-at '-' \
 		--output "${sysroot_tarball}"
 	
-	tar --directory="${toolchain_directory}" --extract --file="${sysroot_tarball}"
+	tar \
+		--directory="${toolchain_directory}" \
+		--extract \
+		--file="${sysroot_tarball}"
 	
 	unlink "${sysroot_tarball}"
 	
@@ -176,6 +241,7 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
+		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
 		--enable-gold \
@@ -184,10 +250,9 @@ for target in "${targets[@]}"; do
 		--disable-gprofng \
 		--with-static-standard-libraries \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
-		${cross_compile_flags} \
-		CFLAGS="${optflags}" \
-		CXXFLAGS="${optflags}" \
-		LDFLAGS="${linkflags}"
+		CFLAGS="${optflags} ${optlto}" \
+		CXXFLAGS="${optflags} ${optlto}" \
+		LDFLAGS="${linkflags} ${optlto}"
 	
 	make all --jobs
 	make install
@@ -199,6 +264,7 @@ for target in "${targets[@]}"; do
 	rm --force --recursive ./*
 	
 	../configure \
+		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
 		--with-linker-hash-style='gnu' \
@@ -206,7 +272,7 @@ for target in "${targets[@]}"; do
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v0.7-${revision}" \
+		--with-pkgversion="Raiden v0.8-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -226,7 +292,7 @@ for target in "${targets[@]}"; do
 		--enable-ld \
 		--enable-gold \
 		--enable-languages='c,c++' \
-		--disable-plugin \
+		--enable-plugin \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-gnu-unique-object \
@@ -241,7 +307,6 @@ for target in "${targets[@]}"; do
 		--disable-nls \
 		--without-headers \
 		${extra_configure_flags} \
-		${cross_compile_flags} \
 		libat_cv_have_ifunc=no \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
@@ -252,13 +317,6 @@ for target in "${targets[@]}"; do
 		CXXFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
 		all --jobs="${max_jobs}"
 	make install
-	
-	cd "${toolchain_directory}/${triplet}/bin"
-	
-	for name in *; do
-		rm "${name}"
-		ln --symbolic "../../bin/${triplet}-${name}" "${name}"
-	done
 	
 	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1"
 	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1plus"

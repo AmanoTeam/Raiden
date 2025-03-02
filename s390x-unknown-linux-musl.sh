@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare extra_configure_flags='--with-arch=z196 --with-tune=zEC12 --with-zarch'
+declare extra_configure_flags='--with-arch=z196 --with-tune=zEC12 --with-zarch --without-long-double-128'
 
 declare triplet='s390x-unknown-linux-musl'
 
