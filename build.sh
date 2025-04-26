@@ -13,7 +13,7 @@ declare -r gmp_tarball='/tmp/gmp.tar.xz'
 declare -r gmp_directory='/tmp/gmp-6.3.0'
 
 declare -r mpfr_tarball='/tmp/mpfr.tar.xz'
-declare -r mpfr_directory='/tmp/mpfr-4.2.1'
+declare -r mpfr_directory='/tmp/mpfr-4.2.2'
 
 declare -r mpc_tarball='/tmp/mpc.tar.gz'
 declare -r mpc_directory='/tmp/mpc-1.3.1'
@@ -25,7 +25,7 @@ declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils-with-gold-2.44'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
-declare -r gcc_directory='/tmp/gcc-master'
+declare -r gcc_directory='/tmp/gcc-15.1.0'
 
 declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
@@ -91,7 +91,7 @@ fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
 	curl \
-		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' \
+		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -162,7 +162,7 @@ fi
 
 if ! [ -f "${gcc_tarball}" ]; then
 	curl \
-		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/master.tar.gz' \
+		--url 'https://ftp.gnu.org/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -193,7 +193,7 @@ cd "${gmp_directory}/build"
 	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
+	--disable-static \
 	CFLAGS="${optflags} ${optlto}" \
 	CXXFLAGS="${optflags} ${optlto}" \
 	LDFLAGS="${linkflags} ${optlto}"
@@ -210,7 +210,7 @@ cd "${mpfr_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
+	--disable-static \
 	CFLAGS="${optflags} ${optlto}" \
 	CXXFLAGS="${optflags} ${optlto}" \
 	LDFLAGS="${linkflags} ${optlto}"
@@ -227,7 +227,7 @@ cd "${mpc_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
+	--disable-static \
 	CFLAGS="${optflags} ${optlto}" \
 	CXXFLAGS="${optflags} ${optlto}" \
 	LDFLAGS="${linkflags} ${optlto}"
@@ -245,7 +245,7 @@ rm --force --recursive ./*
 	--prefix="${toolchain_directory}" \
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
+	--disable-static \
 	CFLAGS="${pieflags} ${optflags} ${optlto}" \
 	CXXFLAGS="${pieflags} ${optflags} ${optlto}" \
 	LDFLAGS="-Wl,-rpath-link -Wl,${toolchain_directory}/lib ${linkflags} ${optlto}"
@@ -324,6 +324,11 @@ for target in "${targets[@]}"; do
 		--enable-default-pie \
 		--enable-default-ssp \
 		--enable-gnu-indirect-function \
+		--enable-libstdcxx-backtrace \
+		--enable-libstdcxx-filesystem-ts \
+		--enable-libstdcxx-static-eh-pool \
+		--with-libstdcxx-zoneinfo='static' \
+		--with-libstdcxx-lock-policy='atomic' \
 		--enable-libssp \
 		--enable-libstdcxx-backtrace \
 		--enable-link-serialization='1' \
@@ -331,11 +336,14 @@ for target in "${targets[@]}"; do
 		--enable-lto \
 		--enable-shared \
 		--enable-threads='posix' \
+		--enable-libstdcxx-threads \
 		--enable-ld \
 		--enable-gold \
 		--enable-languages='c,c++' \
 		--enable-plugin \
 		--enable-libstdcxx-time='yes' \
+		--enable-cxx-flags="${linkflags}" \
+		--with-static-standard-libraries \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-gnu-unique-object \
