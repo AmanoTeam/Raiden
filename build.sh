@@ -13,7 +13,7 @@ declare -r gmp_tarball='/tmp/gmp.tar.xz'
 declare -r gmp_directory='/tmp/gmp-6.3.0'
 
 declare -r mpfr_tarball='/tmp/mpfr.tar.xz'
-declare -r mpfr_directory='/tmp/mpfr-4.2.1'
+declare -r mpfr_directory='/tmp/mpfr-4.2.2'
 
 declare -r mpc_tarball='/tmp/mpc.tar.gz'
 declare -r mpc_directory='/tmp/mpc-1.3.1'
@@ -25,18 +25,15 @@ declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils-with-gold-2.44'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
-declare -r gcc_directory='/tmp/gcc-master'
+declare -r gcc_directory='/tmp/gcc-15.1.0'
 
 declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
 declare -r max_jobs='40'
 
-declare -r optlto="-flto=${max_jobs} -fno-fat-lto-objects"
-declare -r optfatlto="-flto=${max_jobs} -ffat-lto-objects"
-
 declare -r pieflags='-fPIE'
-declare -r optflags='-w -O2'
-declare -r linkflags='-Wl,-s'
+declare -r optflags='-w -O2 -Xlinker --allow-multiple-definition'
+declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
 	'powerpc64le-unknown-linux-musl'
@@ -91,7 +88,7 @@ fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
 	curl \
-		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' \
+		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -162,7 +159,7 @@ fi
 
 if ! [ -f "${gcc_tarball}" ]; then
 	curl \
-		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/master.tar.gz' \
+		--url 'https://ftp.gnu.org/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -193,10 +190,10 @@ cd "${gmp_directory}/build"
 	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -210,10 +207,10 @@ cd "${mpfr_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -227,10 +224,10 @@ cd "${mpc_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -245,10 +242,10 @@ rm --force --recursive ./*
 	--prefix="${toolchain_directory}" \
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${pieflags} ${optflags} ${optlto}" \
-	CXXFLAGS="${pieflags} ${optflags} ${optlto}" \
-	LDFLAGS="-Wl,-rpath-link -Wl,${toolchain_directory}/lib ${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${pieflags} ${optflags}" \
+	CXXFLAGS="${pieflags} ${optflags}" \
+	LDFLAGS="-Xlinker -rpath-link -Xlinker ${toolchain_directory}/lib ${linkflags}"
 
 make all --jobs
 make install
@@ -289,9 +286,9 @@ for target in "${targets[@]}"; do
 		--disable-gprofng \
 		--with-static-standard-libraries \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
-		CFLAGS="${optflags} ${optlto}" \
-		CXXFLAGS="${optflags} ${optlto}" \
-		LDFLAGS="${linkflags} ${optlto}"
+		CFLAGS="${optflags}" \
+		CXXFLAGS="${optflags}" \
+		LDFLAGS="${linkflags}"
 	
 	make all --jobs
 	make install
@@ -301,6 +298,8 @@ for target in "${targets[@]}"; do
 	cd "${gcc_directory}/build"
 	
 	rm --force --recursive ./*
+	
+	export libat_cv_have_ifunc=no
 	
 	../configure \
 		--host="${CROSS_COMPILE_TRIPLET}" \
@@ -324,6 +323,11 @@ for target in "${targets[@]}"; do
 		--enable-default-pie \
 		--enable-default-ssp \
 		--enable-gnu-indirect-function \
+		--enable-libstdcxx-backtrace \
+		--enable-libstdcxx-filesystem-ts \
+		--enable-libstdcxx-static-eh-pool \
+		--with-libstdcxx-zoneinfo='static' \
+		--with-libstdcxx-lock-policy='auto' \
 		--enable-libssp \
 		--enable-libstdcxx-backtrace \
 		--enable-link-serialization='1' \
@@ -331,11 +335,16 @@ for target in "${targets[@]}"; do
 		--enable-lto \
 		--enable-shared \
 		--enable-threads='posix' \
+		--enable-libstdcxx-threads \
 		--enable-ld \
 		--enable-gold \
 		--enable-languages='c,c++' \
 		--enable-plugin \
 		--enable-libstdcxx-time='yes' \
+		--enable-cxx-flags="${linkflags}" \
+		--enable-host-pie \
+		--enable-host-shared \
+		--with-static-standard-libraries \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-gnu-unique-object \
@@ -350,7 +359,6 @@ for target in "${targets[@]}"; do
 		--disable-nls \
 		--without-headers \
 		${extra_configure_flags} \
-		libat_cv_have_ifunc=no \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
 		LDFLAGS="${linkflags}"
