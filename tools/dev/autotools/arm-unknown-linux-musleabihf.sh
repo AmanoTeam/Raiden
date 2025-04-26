@@ -1,9 +1,12 @@
 #/bin/bash
 
+kopt="${-}"
+
+set +u
 set -e
 
 if [ -z "${RAIDEN_HOME}" ]; then
-	RAIDEN_HOME="$(realpath "$(dirname "${0}")")/../../../../.."
+	RAIDEN_HOME="$(realpath "$(( [ -n "${BASH_SOURCE}" ] && dirname "$(realpath "${BASH_SOURCE[0]}")" ) || dirname "$(realpath "${0}")")""/../../../../..")"
 fi
 
 set -u
@@ -40,4 +43,5 @@ export \
 	OBJCOPY \
 	READELF
 
-set +eu
+[[ "${kopt}" = *e*  ]] || set +e
+[[ "${kopt}" = *u*  ]] || set +u

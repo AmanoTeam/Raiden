@@ -13,7 +13,7 @@ declare -r gmp_tarball='/tmp/gmp.tar.xz'
 declare -r gmp_directory='/tmp/gmp-6.3.0'
 
 declare -r mpfr_tarball='/tmp/mpfr.tar.xz'
-declare -r mpfr_directory='/tmp/mpfr-4.2.1'
+declare -r mpfr_directory='/tmp/mpfr-4.2.2'
 
 declare -r mpc_tarball='/tmp/mpc.tar.gz'
 declare -r mpc_directory='/tmp/mpc-1.3.1'
@@ -25,18 +25,18 @@ declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils-with-gold-2.44'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
-declare -r gcc_directory='/tmp/gcc-master'
+declare -r gcc_directory='/tmp/gcc-releases-gcc-15'
+
+declare -r zstd_tarball='/tmp/zstd.tar.gz'
+declare -r zstd_directory='/tmp/zstd-dev'
 
 declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
-declare -r max_jobs='40'
-
-declare -r optlto="-flto=${max_jobs} -fno-fat-lto-objects"
-declare -r optfatlto="-flto=${max_jobs} -ffat-lto-objects"
+declare -r max_jobs='30'
 
 declare -r pieflags='-fPIE'
-declare -r optflags='-w -O2'
-declare -r linkflags='-Wl,-s'
+declare -r optflags='-w -O2 -Xlinker --allow-multiple-definition'
+declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
 	'powerpc64le-unknown-linux-musl'
@@ -91,7 +91,7 @@ fi
 
 if ! [ -f "${mpfr_tarball}" ]; then
 	curl \
-		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz' \
+		--url 'https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -160,9 +160,26 @@ if ! [ -f "${binutils_tarball}" ]; then
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Disable-annoying-linker-warnings.patch"
 fi
 
+if ! [ -f "${zstd_tarball}" ]; then
+	curl \
+		--url 'https://github.com/facebook/zstd/archive/refs/heads/dev.tar.gz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${zstd_tarball}"
+	
+	tar \
+		--directory="$(dirname "${zstd_directory}")" \
+		--extract \
+		--file="${zstd_tarball}"
+fi
+
 if ! [ -f "${gcc_tarball}" ]; then
 	curl \
-		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/master.tar.gz' \
+		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/releases/gcc-15.tar.gz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -193,10 +210,10 @@ cd "${gmp_directory}/build"
 	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -210,10 +227,10 @@ cd "${mpfr_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -227,10 +244,10 @@ cd "${mpc_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -245,13 +262,31 @@ rm --force --recursive ./*
 	--prefix="${toolchain_directory}" \
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
-	--enable-static \
-	CFLAGS="${pieflags} ${optflags} ${optlto}" \
-	CXXFLAGS="${pieflags} ${optflags} ${optlto}" \
-	LDFLAGS="-Wl,-rpath-link -Wl,${toolchain_directory}/lib ${linkflags} ${optlto}"
+	--disable-static \
+	CFLAGS="${pieflags} ${optflags}" \
+	CXXFLAGS="${pieflags} ${optflags}" \
+	LDFLAGS="-Xlinker -rpath-link -Xlinker ${toolchain_directory}/lib ${linkflags}"
 
 make all --jobs
 make install
+
+[ -d "${zstd_directory}/.build" ] || mkdir "${zstd_directory}/.build"
+
+cd "${zstd_directory}/.build"
+rm --force --recursive ./*
+
+cmake \
+	-S "${zstd_directory}/build/cmake" \
+	-B "${PWD}" \
+	-DCMAKE_C_FLAGS="-DZDICT_QSORT=ZDICT_QSORT_MIN ${optflags}" \
+	-DCMAKE_INSTALL_PREFIX="${toolchain_directory}" \
+	-DBUILD_SHARED_LIBS=ON \
+	-DZSTD_BUILD_PROGRAMS=OFF \
+	-DZSTD_BUILD_TESTS=OFF \
+	-DZSTD_BUILD_STATIC=OFF
+
+cmake --build "${PWD}"
+cmake --install "${PWD}" --strip
 
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
@@ -289,9 +324,10 @@ for target in "${targets[@]}"; do
 		--disable-gprofng \
 		--with-static-standard-libraries \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
-		CFLAGS="${optflags} ${optlto}" \
-		CXXFLAGS="${optflags} ${optlto}" \
-		LDFLAGS="${linkflags} ${optlto}"
+		--with-zstd="${toolchain_directory}" \
+		CFLAGS="${optflags} -I${toolchain_directory}/include" \
+		CXXFLAGS="${optflags}" \
+		LDFLAGS="${linkflags}"
 	
 	make all --jobs
 	make install
@@ -302,6 +338,8 @@ for target in "${targets[@]}"; do
 	
 	rm --force --recursive ./*
 	
+	export libat_cv_have_ifunc=no
+	
 	../configure \
 		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triplet}" \
@@ -311,6 +349,7 @@ for target in "${targets[@]}"; do
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-isl="${toolchain_directory}" \
+		--with-zstd="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
 		--with-pkgversion="Raiden v0.8-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
@@ -324,6 +363,11 @@ for target in "${targets[@]}"; do
 		--enable-default-pie \
 		--enable-default-ssp \
 		--enable-gnu-indirect-function \
+		--enable-libstdcxx-backtrace \
+		--enable-libstdcxx-filesystem-ts \
+		--enable-libstdcxx-static-eh-pool \
+		--with-libstdcxx-zoneinfo='static' \
+		--with-libstdcxx-lock-policy='auto' \
 		--enable-libssp \
 		--enable-libstdcxx-backtrace \
 		--enable-link-serialization='1' \
@@ -331,11 +375,17 @@ for target in "${targets[@]}"; do
 		--enable-lto \
 		--enable-shared \
 		--enable-threads='posix' \
+		--enable-libstdcxx-threads \
 		--enable-ld \
 		--enable-gold \
 		--enable-languages='c,c++' \
 		--enable-plugin \
 		--enable-libstdcxx-time='yes' \
+		--enable-cxx-flags="${linkflags}" \
+		--enable-host-pie \
+		--enable-host-shared \
+		--with-specs='%{!fno-plt:%{!fplt:-fno-plt}}' \
+		--with-static-standard-libraries \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-gnu-unique-object \
@@ -350,7 +400,6 @@ for target in "${targets[@]}"; do
 		--disable-nls \
 		--without-headers \
 		${extra_configure_flags} \
-		libat_cv_have_ifunc=no \
 		CFLAGS="${optflags}" \
 		CXXFLAGS="${optflags}" \
 		LDFLAGS="${linkflags}"
@@ -360,6 +409,12 @@ for target in "${targets[@]}"; do
 		CXXFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
 		all --jobs="${max_jobs}"
 	make install
+	
+	cd "${toolchain_directory}/lib/bfd-plugins"
+	
+	if ! [ -f './liblto_plugin.so' ]; then
+		ln --symbolic "../../libexec/gcc/${triplet}/"*'/liblto_plugin.so' './'
+	fi
 	
 	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1"
 	patchelf --add-rpath '$ORIGIN/../../../../lib' "${toolchain_directory}/libexec/gcc/${triplet}/"*"/cc1plus"
