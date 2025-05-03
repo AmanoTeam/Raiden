@@ -35,7 +35,7 @@ declare -r optlto="-flto=${max_jobs} -fno-fat-lto-objects"
 declare -r optfatlto="-flto=${max_jobs} -ffat-lto-objects"
 
 declare -r pieflags='-fPIE'
-declare -r optflags='-w -O2'
+declare -r optflags='-w -O2 -Xlinker --allow-multiple-definition'
 declare -r linkflags='-Wl,-s'
 
 declare -ra targets=(
