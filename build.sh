@@ -31,12 +31,9 @@ declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
 declare -r max_jobs='40'
 
-declare -r optlto="-flto=${max_jobs} -fno-fat-lto-objects"
-declare -r optfatlto="-flto=${max_jobs} -ffat-lto-objects"
-
 declare -r pieflags='-fPIE'
 declare -r optflags='-w -O2 -Xlinker --allow-multiple-definition'
-declare -r linkflags='-Wl,-s'
+declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
 	'powerpc64le-unknown-linux-musl'
@@ -194,9 +191,9 @@ cd "${gmp_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -211,9 +208,9 @@ cd "${mpfr_directory}/build"
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -228,9 +225,9 @@ cd "${mpc_directory}/build"
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags} ${optlto}" \
-	CXXFLAGS="${optflags} ${optlto}" \
-	LDFLAGS="${linkflags} ${optlto}"
+	CFLAGS="${optflags}" \
+	CXXFLAGS="${optflags}" \
+	LDFLAGS="${linkflags}"
 
 make all --jobs
 make install
@@ -246,9 +243,9 @@ rm --force --recursive ./*
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${pieflags} ${optflags} ${optlto}" \
-	CXXFLAGS="${pieflags} ${optflags} ${optlto}" \
-	LDFLAGS="-Wl,-rpath-link -Wl,${toolchain_directory}/lib ${linkflags} ${optlto}"
+	CFLAGS="${pieflags} ${optflags}" \
+	CXXFLAGS="${pieflags} ${optflags}" \
+	LDFLAGS="-Wl,-rpath-link -Wl,${toolchain_directory}/lib ${linkflags}"
 
 make all --jobs
 make install
@@ -289,9 +286,9 @@ for target in "${targets[@]}"; do
 		--disable-gprofng \
 		--with-static-standard-libraries \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
-		CFLAGS="${optflags} ${optlto}" \
-		CXXFLAGS="${optflags} ${optlto}" \
-		LDFLAGS="${linkflags} ${optlto}"
+		CFLAGS="${optflags}" \
+		CXXFLAGS="${optflags}" \
+		LDFLAGS="${linkflags}"
 	
 	make all --jobs
 	make install
@@ -328,7 +325,7 @@ for target in "${targets[@]}"; do
 		--enable-libstdcxx-filesystem-ts \
 		--enable-libstdcxx-static-eh-pool \
 		--with-libstdcxx-zoneinfo='static' \
-		--with-libstdcxx-lock-policy='atomic' \
+		--with-libstdcxx-lock-policy='auto' \
 		--enable-libssp \
 		--enable-libstdcxx-backtrace \
 		--enable-link-serialization='1' \
