@@ -17,7 +17,7 @@ jobs:
       id: check-cache
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0
+        key: gcc-15.1.0-1
         lookup-only: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -45,7 +45,7 @@ jobs:
       if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0
+        key: gcc-15.1.0-1
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
           /tmp/x86_64-linux-gnu.tar.xz.sha256
@@ -70,6 +70,7 @@ jobs:
           'arm-unknown-linux-musleabihf',
           'i386-unknown-linux-musl',
           'armv7l-unknown-linux-musleabihf',
+          'loongarch64-unknown-linux-musl',
           
           # FreeBSD
           'x86_64-unknown-freebsd',
@@ -110,7 +111,7 @@ jobs:
     - name: Restore from cache
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0
+        key: gcc-15.1.0-1
         fail-on-cache-miss: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -134,7 +135,7 @@ jobs:
             # export RAIDEN_HOME='/tmp/raiden'
             export PATH="${RAIDEN_HOME}/bin:${PATH}"
             
-            source "${RAIDEN_HOME}/usr/local/share/raiden/autotools/${{ matrix.target }}.sh"
+            source "${PWD}/tools/dev/autotools/${{ matrix.target }}.sh"
         elif [[ '${{ matrix.target }}' == *'-linux-gnu'* ]]; then
             declare -r OBGGCC_TAG="$(jq --raw-output '.tag_name' <<< "$(curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://api.github.com/repos/AmanoTeam/obggcc/releases/latest')")"
             declare -r OBGGCC_TARBALL='/tmp/toolchain.tar.xz'

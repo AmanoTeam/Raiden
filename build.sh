@@ -41,6 +41,7 @@ declare -r optflags='-w -O2'
 declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
+	'loongarch64-unknown-linux-musl'
 	'powerpc64le-unknown-linux-musl'
 	's390x-unknown-linux-musl'
 	'arm-unknown-linux-musleabihf'
@@ -426,14 +427,14 @@ for target in "${targets[@]}"; do
 		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
-		--with-linker-hash-style='gnu' \
+		--with-linker-hash-style='both' \
 		--with-gmp="${toolchain_directory}" \
 		--with-mpc="${toolchain_directory}" \
 		--with-mpfr="${toolchain_directory}" \
 		--with-isl="${toolchain_directory}" \
 		--with-zstd="${toolchain_directory}" \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v0.9-${revision}" \
+		--with-pkgversion="Raiden v1.0-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -499,6 +500,8 @@ for target in "${targets[@]}"; do
 		all --jobs="${max_jobs}"
 	make install
 	
+	rm "${toolchain_directory}/bin/${triplet}-${triplet}-"* || true
+	
 	cd "${toolchain_directory}/${triplet}/lib64" 2>/dev/null || cd "${toolchain_directory}/${triplet}/lib"
 	
 	[ -f './libiberty.a' ] && unlink './libiberty.a'
@@ -507,6 +510,14 @@ for target in "${targets[@]}"; do
 	
 	if ! [ -f './liblto_plugin.so' ]; then
 		ln --symbolic "../../libexec/gcc/${triplet}/"*'/liblto_plugin.so' './'
+	fi
+	
+	if [ "${CROSS_COMPILE_TRIPLET}" = "${triplet}" ]; then
+		ln \
+			--symbolic \
+			--relative \
+			"${toolchain_directory}/${triplet}/include/c++" \
+			"${toolchain_directory}/include"
 	fi
 done
 
