@@ -17,7 +17,7 @@ jobs:
       id: check-cache
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0-1
+        key: gcc-15.2.0
         lookup-only: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -45,7 +45,7 @@ jobs:
       if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0-1
+        key: gcc-15.2.0
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
           /tmp/x86_64-linux-gnu.tar.xz.sha256
@@ -61,6 +61,7 @@ jobs:
           # Linux (glibc)
           'x86_64-unknown-linux-gnu',
           'i386-unknown-linux-gnu',
+          'arm-unknown-linux-gnueabi',
           'arm-unknown-linux-gnueabihf',
           'aarch64-unknown-linux-gnu',
           
@@ -92,8 +93,9 @@ jobs:
           
           # Android
           'x86_64-unknown-linux-android',
-          'i686-unknown-linux-android',
-          'arm-unknown-linux-androideabi',
+          'i686-unknown-linux-android21',
+          'armv5-unknown-linux-androideabi21',
+          'armv7-unknown-linux-androideabi21',
           'aarch64-unknown-linux-android',
           'riscv64-unknown-linux-android'
         ]
@@ -111,7 +113,7 @@ jobs:
     - name: Restore from cache
       uses: actions/cache@main
       with:
-        key: gcc-15.1.0-1
+        key: gcc-15.2.0
         fail-on-cache-miss: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -208,6 +210,12 @@ jobs:
             export PATH="${PINO_HOME}/bin:${PATH}"
             
             source "${PINO_HOME}/usr/local/share/pino/autotools/${{ matrix.target }}.sh"
+            
+            rm \
+                "${PINO_HOME}/include/bionic/"{zconf,zlib}'.h' \
+                "${PINO_HOME}/"*'-unknown-linux-'{androideabi,android}'/include/'{zconf,zlib}'.h' \
+                "${PINO_HOME}/"*'-unknown-linux-android'*'/lib/libz.'{a,so} \
+                "${PINO_HOME}/"*'-unknown-linux-android'*'/lib/static/libz.'{a,so}
         fi
         
         bash './build.sh' '${{ matrix.target }}'

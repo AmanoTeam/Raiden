@@ -24,10 +24,13 @@ declare -r isl_tarball='/tmp/isl.tar.xz'
 declare -r isl_directory='/tmp/isl-0.27'
 
 declare -r binutils_tarball='/tmp/binutils.tar.xz'
-declare -r binutils_directory='/tmp/binutils-with-gold-2.44'
+declare -r binutils_directory='/tmp/binutils-2.45'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
 declare -r gcc_directory='/tmp/gcc-releases-gcc-15'
+
+declare -r zlib_tarball='/tmp/zlib.tar.gz'
+declare -r zlib_directory='/tmp/zlib-develop'
 
 declare -r zstd_tarball='/tmp/zstd.tar.gz'
 declare -r zstd_directory='/tmp/zstd-dev'
@@ -37,20 +40,20 @@ declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 declare -r max_jobs='30'
 
 declare -r pieflags='-fPIE'
-declare -r optflags='-w -O2'
+declare -r ccflags='-w -O2'
 declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
+	'i386-unknown-linux-musl'
+	'x86_64-unknown-linux-musl'
+	'aarch64-unknown-linux-musl'
 	'loongarch64-unknown-linux-musl'
 	'powerpc64le-unknown-linux-musl'
 	's390x-unknown-linux-musl'
 	'arm-unknown-linux-musleabihf'
 	'armv7l-unknown-linux-musleabihf'
 	'mips64-unknown-linux-musl'
-	'x86_64-unknown-linux-musl'
-	'aarch64-unknown-linux-musl'
 	'riscv64-unknown-linux-musl'
-	'i386-unknown-linux-musl'
 )
 
 declare -r PKG_CONFIG_PATH="${toolchain_directory}/lib/pkgconfig"
@@ -173,7 +176,7 @@ fi
 
 if ! [ -f "${binutils_tarball}" ]; then
 	curl \
-		--url 'https://mirrors.kernel.org/gnu/binutils/binutils-with-gold-2.44.tar.xz' \
+		--url 'https://mirrors.kernel.org/gnu/binutils/binutils-2.45.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -187,9 +190,27 @@ if ! [ -f "${binutils_tarball}" ]; then
 		--extract \
 		--file="${binutils_tarball}"
 	
-	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Revert-gold-Use-char16_t-char32_t-instead-of-uint16_.patch"
-	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Disable-annoying-linker-warnings.patch"
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
+	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Don-t-warn-about-local-symbols-within-the-globals.patch"
+fi
+
+if ! [ -f "${zlib_tarball}" ]; then
+	curl \
+		--url 'https://github.com/madler/zlib/archive/refs/heads/develop.tar.gz' \
+		--retry '30' \
+		--retry-all-errors \
+		--retry-delay '0' \
+		--retry-max-time '0' \
+		--location \
+		--silent \
+		--output "${zlib_tarball}"
+	
+	tar \
+		--directory="$(dirname "${zlib_directory}")" \
+		--extract \
+		--file="${zlib_tarball}"
+	
+	patch --directory="${zlib_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Remove-versioned-SONAME-from-libz.patch"
 fi
 
 if ! [ -f "${zstd_tarball}" ]; then
@@ -274,8 +295,8 @@ cd "${gmp_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags}"
 
 make all --jobs
@@ -291,8 +312,8 @@ cd "${mpfr_directory}/build"
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags}"
 
 make all --jobs
@@ -308,8 +329,8 @@ cd "${mpc_directory}/build"
 	--with-gmp="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${optflags}" \
-	CXXFLAGS="${optflags}" \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags}"
 
 make all --jobs
@@ -326,12 +347,29 @@ rm --force --recursive ./*
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${pieflags} ${optflags}" \
-	CXXFLAGS="${pieflags} ${optflags}" \
+	CFLAGS="${pieflags} ${ccflags}" \
+	CXXFLAGS="${pieflags} ${ccflags}" \
 	LDFLAGS="-Xlinker -rpath-link -Xlinker ${toolchain_directory}/lib ${linkflags}"
 
 make all --jobs
 make install
+
+[ -d "${zlib_directory}/build" ] || mkdir "${zlib_directory}/build"
+
+cd "${zlib_directory}/build"
+rm --force --recursive ./*
+
+../configure \
+	--host="${CROSS_COMPILE_TRIPLET}" \
+	--prefix="${toolchain_directory}" \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
+	LDFLAGS="${linkflags}"
+
+make all --jobs
+make install
+
+unlink "${toolchain_directory}/lib/libz.a"
 
 [ -d "${zstd_directory}/.build" ] || mkdir "${zstd_directory}/.build"
 
@@ -341,7 +379,7 @@ rm --force --recursive ./*
 cmake \
 	-S "${zstd_directory}/build/cmake" \
 	-B "${PWD}" \
-	-DCMAKE_C_FLAGS="-DZDICT_QSORT=ZDICT_QSORT_MIN ${optflags}" \
+	-DCMAKE_C_FLAGS="-DZDICT_QSORT=ZDICT_QSORT_MIN ${ccflags}" \
 	-DCMAKE_INSTALL_PREFIX="${toolchain_directory}" \
 	-DBUILD_SHARED_LIBS=ON \
 	-DZSTD_BUILD_PROGRAMS=OFF \
@@ -357,13 +395,27 @@ cp "${workdir}/submodules/obggcc/tools/ln.sh" '/tmp/ln'
 
 export PATH="/tmp:${PATH}"
 
-# The gold linker build incorrectly detects ffsll() as unsupported.
-if [[ "${CROSS_COMPILE_TRIPLET}" == *'-android'* ]]; then
-	export ac_cv_func_ffsll=yes
+if [[ "${CROSS_COMPILE_TRIPLET}" == 'arm'*'-android'* ]]; then
+	export \
+		ac_cv_func_fseeko='no' \
+		ac_cv_func_ftello='no'
 fi
 
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
+	
+	declare specs='%{!ftrivial-auto-var-init*:-ftrivial-auto-var-init=zero}'
+	declare link_specs='-Xlinker -z -Xlinker noexecstack -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now'
+	
+	if [ "${triplet}" = 'x86_64-unknown-linux-musl' ] || [ "${triplet}" = 'i386-unknown-linux-musl' ]; then
+		specs+=' %{!fno-plt:%{!fplt:-fno-plt}}'
+	fi
+	
+	if [ "${triplet}" = 'x86_64-unknown-linux-musl' ] || [ "${triplet}" = 'i386-unknown-linux-musl' ] || [ "${triplet}" = 'aarch64-unknown-linux-musl' ] || [ "${triplet}" = 'powerpc64le-unknown-linux-musl' ] || [ "${triplet}" = 'loongarch64-unknown-linux-musl' ]; then
+		link_specs+=' -Xlinker -z -Xlinker pack-relative-relocs'
+	fi
+	
+	specs+=" %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:${link_specs}}}}}}}"
 	
 	cd "$(mktemp --directory)"
 	
@@ -392,7 +444,7 @@ for target in "${targets[@]}"; do
 		--host="${CROSS_COMPILE_TRIPLET}" \
 		--target="${triplet}" \
 		--prefix="${toolchain_directory}" \
-		--enable-gold \
+		--disable-gold \
 		--enable-ld \
 		--enable-lto \
 		--enable-separate-code \
@@ -402,12 +454,14 @@ for target in "${targets[@]}"; do
 		--enable-default-compressed-debug-sections-algorithm='zstd' \
 		--disable-gprofng \
 		--disable-default-execstack \
+		--disable-warn-rwx-segments \
 		--without-static-standard-libraries \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-zstd="${toolchain_directory}" \
-		CFLAGS="${optflags}" \
-		CXXFLAGS="${optflags}" \
-		LDFLAGS="${linkflags}"
+		--with-system-zlib \
+		CFLAGS="-I${toolchain_directory}/include ${ccflags}" \
+		CXXFLAGS="-I${toolchain_directory}/include ${ccflags}" \
+		LDFLAGS="-L${toolchain_directory}/lib ${linkflags}"
 	
 	make all --jobs
 	make install
@@ -433,8 +487,9 @@ for target in "${targets[@]}"; do
 		--with-mpfr="${toolchain_directory}" \
 		--with-isl="${toolchain_directory}" \
 		--with-zstd="${toolchain_directory}" \
+		--with-system-zlib \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v1.0-${revision}" \
+		--with-pkgversion="Raiden v1.1-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -468,7 +523,8 @@ for target in "${targets[@]}"; do
 		--enable-host-pie \
 		--enable-host-shared \
 		--enable-host-bind-now \
-		--with-specs='%{!fno-plt:%{!fplt:-fno-plt}}' \
+		--enable-libgomp \
+		--with-specs="${specs}" \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-symvers \
@@ -476,16 +532,15 @@ for target in "${targets[@]}"; do
 		--disable-target-libiberty \
 		--disable-multilib \
 		--disable-werror \
-		--disable-libgomp \
 		--disable-bootstrap \
 		--disable-libstdcxx-pch \
 		--disable-nls \
 		--without-headers \
 		--without-static-standard-libraries \
 		${extra_configure_flags} \
-		CFLAGS="${optflags}" \
-		CXXFLAGS="${optflags}" \
-		LDFLAGS="${linkflags}"
+		CFLAGS="${ccflags}" \
+		CXXFLAGS="${ccflags}" \
+		LDFLAGS="-L${toolchain_directory}/lib ${linkflags}"
 	
 	declare args=''
 	
@@ -494,8 +549,8 @@ for target in "${targets[@]}"; do
 	fi
 	
 	env ${args} make \
-		CFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
-		CXXFLAGS_FOR_TARGET="${optflags} ${linkflags}" \
+		CFLAGS_FOR_TARGET="${ccflags} ${linkflags}" \
+		CXXFLAGS_FOR_TARGET="${ccflags} ${linkflags}" \
 		gcc_cv_objdump="${CROSS_COMPILE_TRIPLET}-objdump" \
 		all --jobs="${max_jobs}"
 	make install
@@ -503,6 +558,12 @@ for target in "${targets[@]}"; do
 	rm "${toolchain_directory}/bin/${triplet}-${triplet}-"* || true
 	
 	cd "${toolchain_directory}/${triplet}/lib64" 2>/dev/null || cd "${toolchain_directory}/${triplet}/lib"
+	
+	if [[ "$(basename "${PWD}")" = 'lib64' ]]; then
+		mv './'* '../lib' || true
+		rmdir "${PWD}"
+		cd '../lib'
+	fi
 	
 	[ -f './libiberty.a' ] && unlink './libiberty.a'
 	
@@ -573,3 +634,11 @@ fi
 mkdir --parent "${share_directory}"
 
 cp --recursive "${workdir}/tools/dev/"* "${share_directory}"
+
+[ -d "${toolchain_directory}/build" ] || mkdir "${toolchain_directory}/build"
+
+ln \
+	--symbolic \
+	--relative \
+	"${share_directory}/"* \
+	"${toolchain_directory}/build"
