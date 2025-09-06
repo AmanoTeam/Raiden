@@ -24,7 +24,7 @@ declare -r isl_tarball='/tmp/isl.tar.xz'
 declare -r isl_directory='/tmp/isl-0.27'
 
 declare -r binutils_tarball='/tmp/binutils.tar.xz'
-declare -r binutils_directory='/tmp/binutils-2.45'
+declare -r binutils_directory='/tmp/binutils'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
 declare -r gcc_directory='/tmp/gcc-releases-gcc-15'
@@ -176,7 +176,7 @@ fi
 
 if ! [ -f "${binutils_tarball}" ]; then
 	curl \
-		--url 'https://mirrors.kernel.org/gnu/binutils/binutils-2.45.tar.xz' \
+		--url 'https://github.com/AmanoTeam/binutils-snapshots/releases/latest/download/binutils.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -404,7 +404,8 @@ fi
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
 	
-	declare specs='%{!ftrivial-auto-var-init*:-ftrivial-auto-var-init=zero}'
+	declare specs='%{!D__MUSL__*:-D __MUSL__}'
+	
 	declare link_specs='-Xlinker -z -Xlinker noexecstack -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now'
 	
 	if [ "${triplet}" = 'x86_64-unknown-linux-musl' ] || [ "${triplet}" = 'i386-unknown-linux-musl' ]; then
