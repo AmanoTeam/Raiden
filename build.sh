@@ -190,6 +190,13 @@ if ! [ -f "${binutils_tarball}" ]; then
 		--extract \
 		--file="${binutils_tarball}"
 	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-darwin'* ]]; then
+		sed \
+			--in-place \
+			's/$$ORIGIN/@loader_path/g' \
+			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
+	fi
+	
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Don-t-warn-about-local-symbols-within-the-globals.patch"
 fi
@@ -232,7 +239,7 @@ fi
 
 if ! [ -f "${gcc_tarball}" ]; then
 	curl \
-		--url 'https://github.com/gcc-mirror/gcc/archive/refs/heads/releases/gcc-15.tar.gz' \
+		--url 'https://github.com/gcc-mirror/gcc/archive/releases/gcc-15.tar.gz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -246,6 +253,13 @@ if ! [ -f "${gcc_tarball}" ]; then
 		--extract \
 		--file="${gcc_tarball}"
 	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-darwin'* ]]; then
+		sed \
+			--in-place \
+			's/$$ORIGIN/@loader_path/g' \
+			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-GCC-host-tools.patch"
+	fi
+	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libgcc-build-on-musl.patch"
 	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Fix-libgcc-build-on-arm.patch"
@@ -253,6 +267,7 @@ if ! [ -f "${gcc_tarball}" ]; then
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wimplicit-int-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wint-conversion-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Revert-GCC-change-about-turning-Wimplicit-function-d.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wincompatible-pointer-types-back-into-an-warnin.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-GCC-host-tools.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-ARM-and-ARM64-drivers-to-OpenBSD-host-tools.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Fix-missing-stdint.h-include-when-compiling-host-tools-on-OpenBSD.patch"
@@ -341,6 +356,12 @@ make install
 cd "${isl_directory}/build"
 rm --force --recursive ./*
 
+declare isl_ldflags=''
+
+if [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
+	isl_ldflags+=" -Xlinker -rpath-link -Xlinker ${toolchain_directory}/lib"
+fi
+
 ../configure \
 	--host="${CROSS_COMPILE_TRIPLET}" \
 	--prefix="${toolchain_directory}" \
@@ -349,7 +370,7 @@ rm --force --recursive ./*
 	--disable-static \
 	CFLAGS="${pieflags} ${ccflags}" \
 	CXXFLAGS="${pieflags} ${ccflags}" \
-	LDFLAGS="-Xlinker -rpath-link -Xlinker ${toolchain_directory}/lib ${linkflags}"
+	LDFLAGS="${linkflags} ${isl_ldflags}"
 
 make all --jobs
 make install
@@ -376,9 +397,16 @@ unlink "${toolchain_directory}/lib/libz.a"
 cd "${zstd_directory}/.build"
 rm --force --recursive ./*
 
+declare cmake_flags=''
+
+if [[ "${CROSS_COMPILE_TRIPLET}" = *'-darwin'* ]]; then
+	cmake_flags+=' -DCMAKE_SYSTEM_NAME=Darwin'
+fi
+
 cmake \
 	-S "${zstd_directory}/build/cmake" \
 	-B "${PWD}" \
+	${cmake_flags} \
 	-DCMAKE_C_FLAGS="-DZDICT_QSORT=ZDICT_QSORT_MIN ${ccflags}" \
 	-DCMAKE_INSTALL_PREFIX="${toolchain_directory}" \
 	-DBUILD_SHARED_LIBS=ON \
@@ -395,10 +423,18 @@ cp "${workdir}/submodules/obggcc/tools/ln.sh" '/tmp/ln'
 
 export PATH="/tmp:${PATH}"
 
-if [[ "${CROSS_COMPILE_TRIPLET}" == 'arm'*'-android'* ]]; then
+if [[ "${CROSS_COMPILE_TRIPLET}" = 'arm'*'-android'* ]] || [[ "${CROSS_COMPILE_TRIPLET}" = 'i686-'*'-android'* ]] || [[ "${CROSS_COMPILE_TRIPLET}" = 'mipsel-'*'-android'* ]]; then
 	export \
 		ac_cv_func_fseeko='no' \
 		ac_cv_func_ftello='no'
+fi
+
+if [[ "${CROSS_COMPILE_TRIPLET}" = 'armv5'*'-android'* ]]; then
+	export PINO_ARM_MODE='true'
+fi
+
+if [[ "${CROSS_COMPILE_TRIPLET}" = *'-haiku' ]]; then
+	export ac_cv_c_bigendian='no'
 fi
 
 for target in "${targets[@]}"; do
@@ -472,6 +508,10 @@ for target in "${targets[@]}"; do
 		extra_configure_flags+=" --with-toolexeclibdir=${toolchain_directory}/${triplet}/lib/"
 	fi
 	
+	if [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
+		extra_configure_flags+=' --enable-host-bind-now'
+	fi
+	
 	[ -d "${gcc_directory}/build" ] || mkdir "${gcc_directory}/build"
 	
 	cd "${gcc_directory}/build"
@@ -490,7 +530,7 @@ for target in "${targets[@]}"; do
 		--with-zstd="${toolchain_directory}" \
 		--with-system-zlib \
 		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v1.1-${revision}" \
+		--with-pkgversion="Raiden v1.2-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -523,7 +563,6 @@ for target in "${targets[@]}"; do
 		--enable-cxx-flags="${linkflags}" \
 		--enable-host-pie \
 		--enable-host-shared \
-		--enable-host-bind-now \
 		--enable-libgomp \
 		--with-specs="${specs}" \
 		--disable-libsanitizer \
@@ -601,7 +640,7 @@ if ! (( is_native )); then
 fi
 
 # Bundle both libstdc++ and libgcc within host tools
-if ! (( is_native )); then
+if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	[ -d "${toolchain_directory}/lib" ] || mkdir "${toolchain_directory}/lib"
 	
 	# libstdc++
