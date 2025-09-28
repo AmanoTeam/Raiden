@@ -2,20 +2,10 @@
 
 A GCC cross-compiler targeting Linux musl.
 
-## Target architectures
+## What is this?
 
-We currently build cross-compilers targeting many Linux architectures. See above for more info:
-
-* `aarch64-unknown-linux-musl`
-* `arm-unknown-linux-musleabihf`
-* `armv7l-unknown-linux-musleabihf`
-* `i386-unknown-linux-musl`
-* `powerpc64le-unknown-linux-musl`
-* `riscv64-unknown-linux-musl`
-* `s390x-unknown-linux-musl`
-* `x86_64-unknown-linux-musl`
-* `mips64-unknown-linux-musl`
+This is a GCC cross-compiler targeting Linux musl. You can use it to create fully statically linked binaries that work on any Linux distro, or dynamically linked binaries suitable for use in Linux distros based on musl libc, such as Alpine Linux and Void Linux.
 
 ## Releases
 
-You can obtain releases from the  [releases](https://github.com/AmanoTeam/muslcr00s/releases) page.
+You can obtain releases from the [releases](https://github.com/AmanoTeam/Raiden/releases) page. Precompiled binaries are available for most platforms, except Windows.
