@@ -325,7 +325,7 @@ sed \
 
 declare disable_assembly='--disable-assembly'
 
-if [[ "${host}" != 'mips64el-'* ]]; then
+if [[ "${CROSS_COMPILE_TRIPLET}" != 'mips64el-'* ]]; then
 	disable_assembly=''
 fi
 
