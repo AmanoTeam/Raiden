@@ -39,7 +39,6 @@ declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
 declare -r max_jobs='30'
 
-declare -r pieflags='-fPIE'
 declare -r ccflags='-w -O2'
 declare -r linkflags='-Xlinker -s'
 
@@ -157,7 +156,7 @@ fi
 
 if ! [ -f "${isl_tarball}" ]; then
 	curl \
-		--url 'https://sourceforge.net/projects/libisl/files/isl-0.27.tar.xz' \
+		--url 'https://deb.debian.org/debian/pool/main/i/isl/isl_0.27.orig.tar.xz' \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -194,6 +193,13 @@ if ! [ -f "${binutils_tarball}" ]; then
 		sed \
 			--in-place \
 			's/$$ORIGIN/@loader_path/g' \
+			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
+	fi
+	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+		sed \
+			--in-place \
+			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
 			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
 	fi
 	
@@ -257,20 +263,27 @@ if ! [ -f "${gcc_tarball}" ]; then
 		sed \
 			--in-place \
 			's/$$ORIGIN/@loader_path/g' \
-			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-GCC-host-tools.patch"
+			"${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
+	fi
+	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+		sed \
+			--in-place \
+			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
+			"${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
 	fi
 	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libgcc-build-on-musl.patch"
 	
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Fix-libgcc-build-on-arm.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Change-the-default-language-version-for-C-compilatio.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wimplicit-int-back-into-an-warning.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wint-conversion-back-into-an-warning.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Revert-GCC-change-about-turning-Wimplicit-function-d.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wincompatible-pointer-types-back-into-an-warnin.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-GCC-host-tools.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-ARM-and-ARM64-drivers-to-OpenBSD-host-tools.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Fix-missing-stdint.h-include-when-compiling-host-tools-on-OpenBSD.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Turn-Wimplicit-function-declaration-back-into-an-warning.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0002-Fix-libsanitizer-build-on-older-platforms.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0003-Change-the-default-language-version-for-C-compilation-from-std-gnu23-to-std-gnu17.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/gcc-15/0004-Turn-Wimplicit-int-back-into-an-warning.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0005-Turn-Wint-conversion-back-into-an-warning.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/gcc-15/0006-Turn-Wincompatible-pointer-types-back-into-an-warning.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0008-Add-ARM-and-ARM64-drivers-to-OpenBSD-host-tools.patch" || true
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0009-Fix-missing-stdint.h-include-when-compiling-host-tools-on-OpenBSD.patch"
 fi
 
 # Follow Debian's approach for removing hardcoded RPATH from binaries
@@ -284,6 +297,15 @@ sed \
 	"${mpfr_directory}/configure" \
 	"${gmp_directory}/configure" \
 	"${gcc_directory}/libsanitizer/configure"
+
+# Avoid using absolute hardcoded install_name values on macOS
+sed \
+	--in-place \
+	's|-install_name \\$rpath/\\$soname|-install_name @rpath/\\$soname|g' \
+	"${isl_directory}/configure" \
+	"${mpc_directory}/configure" \
+	"${mpfr_directory}/configure" \
+	"${gmp_directory}/configure"
 
 # Fix Autotools mistakenly detecting shared libraries as not supported on OpenBSD
 while read file; do
@@ -301,6 +323,12 @@ sed \
 	"${gcc_directory}/configure" \
 	"${binutils_directory}/configure"
 
+declare disable_assembly='--disable-assembly'
+
+if [[ "${CROSS_COMPILE_TRIPLET}" != 'mips64el-'* ]]; then
+	disable_assembly=''
+fi
+
 [ -d "${gmp_directory}/build" ] || mkdir "${gmp_directory}/build"
 
 cd "${gmp_directory}/build"
@@ -310,6 +338,7 @@ cd "${gmp_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
+	${disable_assembly} \
 	CFLAGS="${ccflags}" \
 	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags}"
@@ -368,8 +397,9 @@ fi
 	--with-gmp-prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
-	CFLAGS="${pieflags} ${ccflags}" \
-	CXXFLAGS="${pieflags} ${ccflags}" \
+	--with-pic \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags} ${isl_ldflags}"
 
 make all --jobs
@@ -439,20 +469,6 @@ fi
 
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
-	
-	declare specs='%{!D__MUSL__*:-D __MUSL__}'
-	
-	declare link_specs='-Xlinker -z -Xlinker noexecstack -Xlinker -z -Xlinker relro -Xlinker -z -Xlinker now'
-	
-	if [ "${triplet}" = 'x86_64-unknown-linux-musl' ] || [ "${triplet}" = 'i386-unknown-linux-musl' ]; then
-		specs+=' %{!fno-plt:%{!fplt:-fno-plt}}'
-	fi
-	
-	if [ "${triplet}" = 'x86_64-unknown-linux-musl' ] || [ "${triplet}" = 'i386-unknown-linux-musl' ] || [ "${triplet}" = 'aarch64-unknown-linux-musl' ] || [ "${triplet}" = 'powerpc64le-unknown-linux-musl' ] || [ "${triplet}" = 'loongarch64-unknown-linux-musl' ]; then
-		link_specs+=' -Xlinker -z -Xlinker pack-relative-relocs'
-	fi
-	
-	specs+=" %{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S:${link_specs}}}}}}}"
 	
 	cd "$(mktemp --directory)"
 	
@@ -529,8 +545,6 @@ for target in "${targets[@]}"; do
 		--with-isl="${toolchain_directory}" \
 		--with-zstd="${toolchain_directory}" \
 		--with-system-zlib \
-		--with-bugurl='https://github.com/AmanoTeam/Raiden/issues' \
-		--with-pkgversion="Raiden v1.2-${revision}" \
 		--with-sysroot="${toolchain_directory}/${triplet}" \
 		--with-gcc-major-version-only \
 		--with-native-system-header-dir='/include' \
@@ -564,7 +578,7 @@ for target in "${targets[@]}"; do
 		--enable-host-pie \
 		--enable-host-shared \
 		--enable-libgomp \
-		--with-specs="${specs}" \
+		--with-pic \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-symvers \
@@ -643,30 +657,50 @@ fi
 if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	[ -d "${toolchain_directory}/lib" ] || mkdir "${toolchain_directory}/lib"
 	
-	# libstdc++
-	declare name=$(realpath $("${cc}" --print-file-name='libstdc++.so'))
-	
 	# libestdc++
+	declare name=$(realpath $("${cc}" --print-file-name='libestdc++.so'))
+	
+	# libstdc++
 	if ! [ -f "${name}" ]; then
-		declare name=$(realpath $("${cc}" --print-file-name='libestdc++.so'))
+		declare name=$(realpath $("${cc}" --print-file-name='libstdc++.so'))
 	fi
 	
 	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
-	# OpenBSD does not have a libgcc library
-	if [[ "${CROSS_COMPILE_TRIPLET}" != *'-openbsd'* ]]; then
+	# libegcc
+	declare name=$(realpath $("${cc}" --print-file-name='libegcc.so'))
+	
+	if ! [ -f "${name}" ]; then
 		# libgcc_s
 		declare name=$(realpath $("${cc}" --print-file-name='libgcc_s.so.1'))
-		
-		# libegcc
-		if ! [ -f "${name}" ]; then
-			declare name=$(realpath $("${cc}" --print-file-name='libegcc.so'))
-		fi
-		
+	fi
+	
+	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	
+	cp "${name}" "${toolchain_directory}/lib/${soname}"
+	
+	# libatomic
+	declare name=$(realpath $("${cc}" --print-file-name='libatomic.so'))
+	
+	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	
+	cp "${name}" "${toolchain_directory}/lib/${soname}"
+	
+	# libiconv
+	declare name=$(realpath $("${cc}" --print-file-name='libiconv.so'))
+	
+	if [ -f "${name}" ]; then
 		declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
-		
+		cp "${name}" "${toolchain_directory}/lib/${soname}"
+	fi
+	
+	# libcharset
+	declare name=$(realpath $("${cc}" --print-file-name='libcharset.so'))
+	
+	if [ -f "${name}" ]; then
+		declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 		cp "${name}" "${toolchain_directory}/lib/${soname}"
 	fi
 fi
