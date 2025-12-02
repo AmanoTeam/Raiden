@@ -216,12 +216,6 @@ jobs:
             export PATH="${PINO_HOME}/bin:${PATH}"
             
             source "${PINO_HOME}/usr/local/share/pino/autotools/${{ matrix.target }}.sh"
-            
-            rm \
-                "${PINO_HOME}/include/bionic/"{zconf,zlib}'.h' \
-                "${PINO_HOME}/"*'-unknown-linux-'{androideabi,android}'/include/'{zconf,zlib}'.h' \
-                "${PINO_HOME}/"*'-unknown-linux-android'*'/lib/libz.so' \
-                "${PINO_HOME}/"*'-unknown-linux-android'*'/lib/static/libz.so'
         elif [[ '${{ matrix.target }}' == *'-darwin' ]]; then
             curl \
                 --silent \
@@ -250,3 +244,23 @@ jobs:
         path: |
           /tmp/${{ matrix.target }}.tar.xz
           /tmp/${{ matrix.target }}.tar.xz.sha256
+
+  release:
+    needs: cross-build
+    runs-on: ubuntu-latest
+    name: Create release
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@main
+      - name: Create release
+        uses: softprops/action-gh-release@master
+        with:
+          tag_name: gcc-15
+          name: GCC 15.2.0
+          files: ./*/*-unknown-*.tar.xz*
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          body: "* Update to GCC 15.2.0"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
