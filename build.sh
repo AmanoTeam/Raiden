@@ -196,6 +196,13 @@ if ! [ -f "${binutils_tarball}" ]; then
 			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
 	fi
 	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+		sed \
+			--in-place \
+			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
+			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
+	fi
+	
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
 	patch --directory="${binutils_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Don-t-warn-about-local-symbols-within-the-globals.patch"
 fi
@@ -256,7 +263,14 @@ if ! [ -f "${gcc_tarball}" ]; then
 		sed \
 			--in-place \
 			's/$$ORIGIN/@loader_path/g' \
-			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-GCC-host-tools.patch"
+			"${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
+	fi
+	
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+		sed \
+			--in-place \
+			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
+			"${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
 	fi
 	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/patches/0001-Fix-libgcc-build-on-musl.patch"
@@ -309,6 +323,12 @@ sed \
 	"${gcc_directory}/configure" \
 	"${binutils_directory}/configure"
 
+declare disable_assembly='--disable-assembly'
+
+if [[ "${host}" != 'mips64el-'* ]]; then
+	disable_assembly=''
+fi
+
 [ -d "${gmp_directory}/build" ] || mkdir "${gmp_directory}/build"
 
 cd "${gmp_directory}/build"
@@ -318,6 +338,7 @@ cd "${gmp_directory}/build"
 	--prefix="${toolchain_directory}" \
 	--enable-shared \
 	--disable-static \
+	${disable_assembly} \
 	CFLAGS="${ccflags}" \
 	CXXFLAGS="${ccflags}" \
 	LDFLAGS="${linkflags}"
