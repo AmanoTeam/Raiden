@@ -11,6 +11,8 @@ declare -r share_directory="${toolchain_directory}/usr/local/share/raiden"
 
 declare -r environment="LD_LIBRARY_PATH=${toolchain_directory}/lib PATH=${PATH}:${toolchain_directory}/bin"
 
+declare -r gcc_major='15'
+
 declare -r gmp_tarball='/tmp/gmp.tar.xz'
 declare -r gmp_directory='/tmp/gmp-6.3.0'
 
@@ -27,7 +29,7 @@ declare -r binutils_tarball='/tmp/binutils.tar.xz'
 declare -r binutils_directory='/tmp/binutils'
 
 declare -r gcc_tarball='/tmp/gcc.tar.xz'
-declare -r gcc_directory='/tmp/gcc-releases-gcc-15'
+declare -r gcc_directory="/tmp/gcc-releases-gcc-${gcc_major}"
 
 declare -r zlib_tarball='/tmp/zlib.tar.gz'
 declare -r zlib_directory='/tmp/zlib-develop'
@@ -196,7 +198,7 @@ if ! [ -f "${binutils_tarball}" ]; then
 			"${workdir}/submodules/obggcc/patches/0001-Add-relative-RPATHs-to-binutils-host-tools.patch"
 	fi
 	
-	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]] || [[ "${CROSS_COMPILE_TRIPLET}" = *'dragonfly' ]] then
 		sed \
 			--in-place \
 			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
@@ -245,7 +247,7 @@ fi
 
 if ! [ -f "${gcc_tarball}" ]; then
 	curl \
-		--url 'https://github.com/gcc-mirror/gcc/archive/releases/gcc-15.tar.gz' \
+		--url "https://github.com/gcc-mirror/gcc/archive/releases/gcc-${gcc_major}.tar.gz" \
 		--retry '30' \
 		--retry-all-errors \
 		--retry-delay '0' \
@@ -266,7 +268,7 @@ if ! [ -f "${gcc_tarball}" ]; then
 			"${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
 	fi
 	
-	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'bsd'* ]] || [[ "${CROSS_COMPILE_TRIPLET}" = *'dragonfly' ]] then
 		sed \
 			--in-place \
 			's/-Xlinker -rpath/-Xlinker -z -Xlinker origin -Xlinker -rpath/g' \
@@ -284,6 +286,10 @@ if ! [ -f "${gcc_tarball}" ]; then
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0008-Add-ARM-and-ARM64-drivers-to-OpenBSD-host-tools.patch" || true
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0009-Fix-missing-stdint.h-include-when-compiling-host-tools-on-OpenBSD.patch"
+	
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/gcc-15/0001-Enable-automatic-linking-of-libatomic.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-AArch64-enable-libquadmath.patch"
+	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-Prevent-libstdc-from-trying-to-implement-math-stubs.patch"
 fi
 
 # Follow Debian's approach for removing hardcoded RPATH from binaries
@@ -578,12 +584,11 @@ for target in "${targets[@]}"; do
 		--enable-host-pie \
 		--enable-host-shared \
 		--enable-libgomp \
+		--enable-tls \
 		--with-pic \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-symvers \
-		--disable-sjlj-exceptions \
-		--disable-target-libiberty \
 		--disable-multilib \
 		--disable-werror \
 		--disable-bootstrap \
@@ -609,6 +614,8 @@ for target in "${targets[@]}"; do
 		all --jobs="${max_jobs}"
 	make install
 	
+	cat "${workdir}/submodules/obggcc/patches/c++config.h" >> "${toolchain_directory}/${triplet}/include/c++/${gcc_major}/${triplet}/bits/c++config.h"
+	
 	rm "${toolchain_directory}/bin/${triplet}-${triplet}-"* || true
 	
 	cd "${toolchain_directory}/${triplet}/lib64" 2>/dev/null || cd "${toolchain_directory}/${triplet}/lib"
@@ -626,18 +633,15 @@ for target in "${targets[@]}"; do
 	if ! [ -f './liblto_plugin.so' ]; then
 		ln --symbolic "../../libexec/gcc/${triplet}/"*'/liblto_plugin.so' './'
 	fi
-	
-	if [ "${CROSS_COMPILE_TRIPLET}" = "${triplet}" ]; then
-		ln \
-			--symbolic \
-			--relative \
-			"${toolchain_directory}/${triplet}/include/c++" \
-			"${toolchain_directory}/include"
-	fi
 done
 
 # Delete libtool files and other unnecessary files GCC installs
-rm --force --recursive "${toolchain_directory}/share"
+rm \
+	--force \
+	--recursive \
+	"${toolchain_directory}/share" \
+	"${toolchain_directory}/lib/lib"*'.a' \
+	"${toolchain_directory}/include"
 
 find \
 	"${toolchain_directory}" \
