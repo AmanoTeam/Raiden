@@ -47,14 +47,14 @@ declare -r linkflags='-Xlinker -s'
 declare -ra targets=(
 	'i386-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
+	'armv6-unknown-linux-musleabihf'
+	'armv7-unknown-linux-musleabihf'
 	'aarch64-unknown-linux-musl'
-	'loongarch64-unknown-linux-musl'
-	'powerpc64le-unknown-linux-musl'
-	's390x-unknown-linux-musl'
-	'arm-unknown-linux-musleabihf'
-	'armv7l-unknown-linux-musleabihf'
-	'mips64-unknown-linux-musl'
-	'riscv64-unknown-linux-musl'
+	# 'loongarch64-unknown-linux-musl'
+	# 'powerpc64le-unknown-linux-musl'
+	# 's390x-unknown-linux-musl'
+	# 'mips64-unknown-linux-musl'
+	# 'riscv64-unknown-linux-musl'
 )
 
 declare -r PKG_CONFIG_PATH="${toolchain_directory}/lib/pkgconfig"
@@ -284,8 +284,6 @@ if ! [ -f "${gcc_tarball}" ]; then
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0005-Turn-Wint-conversion-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/gcc-15/0006-Turn-Wincompatible-pointer-types-back-into-an-warning.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0007-Add-relative-RPATHs-to-GCC-host-tools.patch"
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0008-Add-ARM-and-ARM64-drivers-to-OpenBSD-host-tools.patch" || true
-	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0009-Fix-missing-stdint.h-include-when-compiling-host-tools-on-OpenBSD.patch"
 	
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/gcc-15/0001-Enable-automatic-linking-of-libatomic.patch"
 	patch --directory="${gcc_directory}" --strip='1' --input="${workdir}/submodules/obggcc/patches/0001-AArch64-enable-libquadmath.patch"
@@ -312,15 +310,6 @@ sed \
 	"${mpc_directory}/configure" \
 	"${mpfr_directory}/configure" \
 	"${gmp_directory}/configure"
-
-# Fix Autotools mistakenly detecting shared libraries as not supported on OpenBSD
-while read file; do
-	sed \
-		--in-place \
-		--regexp-extended \
-		's|test -f /usr/libexec/ld.so|true|g' \
-		"${file}"
-done <<< "$(find '/tmp' -type 'f' -name 'configure')"
 
 # Force GCC and binutils to prefix host tools with the target triplet even in native builds
 sed \

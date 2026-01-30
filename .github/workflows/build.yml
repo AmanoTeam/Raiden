@@ -17,7 +17,7 @@ jobs:
       id: check-cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1
+        key: gcc-15.2.1-1
         lookup-only: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -45,7 +45,7 @@ jobs:
       if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1
+        key: gcc-15.2.1-1
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
           /tmp/x86_64-linux-gnu.tar.xz.sha256
@@ -72,10 +72,9 @@ jobs:
           # Linux (musl)
           'aarch64-unknown-linux-musl',
           'x86_64-unknown-linux-musl',
-          'arm-unknown-linux-musleabihf',
+          'armv6-unknown-linux-musleabihf',
+          'armv7-unknown-linux-musleabihf',
           'i386-unknown-linux-musl',
-          'armv7l-unknown-linux-musleabihf',
-          'loongarch64-unknown-linux-musl',
           
           # FreeBSD
           'x86_64-unknown-freebsd',
@@ -85,12 +84,6 @@ jobs:
           # NetBSD
           'i386-unknown-netbsdelf',
           'x86_64-unknown-netbsd',
-          
-          # OpenBSD
-          'x86_64-unknown-openbsd',
-          'i386-unknown-openbsd',
-          'aarch64-unknown-openbsd',
-          'arm-unknown-openbsd',
           
           # DragonFly BSD
           'x86_64-unknown-dragonfly',
@@ -119,7 +112,7 @@ jobs:
     - name: Restore from cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1
+        key: gcc-15.2.1-1
         fail-on-cache-miss: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -180,18 +173,6 @@ jobs:
             export PATH="${DAKINI_HOME}/bin:${PATH}"
             
             source "${DAKINI_HOME}/usr/local/share/dakini/autotools/${{ matrix.target }}.sh"
-        elif [[ '${{ matrix.target }}' == *'-openbsd'* ]]; then
-            declare -r ATAR_TAG="$(jq --raw-output '.tag_name' <<< "$(curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://api.github.com/repos/AmanoTeam/Atar/releases/latest')")"
-            declare -r ATAR_TARBALL='/tmp/toolchain.tar.xz'
-            declare -r ATAR_URL="https://github.com/AmanoTeam/Atar/releases/download/${ATAR_TAG}/x86_64-unknown-linux-gnu.tar.xz"
-            
-            curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --url "${ATAR_URL}" --output "${ATAR_TARBALL}"
-            tar --directory="$(dirname "${ATAR_TARBALL}")" --extract --file="${ATAR_TARBALL}"
-            
-            export ATAR_HOME='/tmp/atar'
-            export PATH="${ATAR_HOME}/bin:${PATH}"
-            
-            source "${ATAR_HOME}/usr/local/share/atar/autotools/${{ matrix.target }}.sh"
         elif [[ '${{ matrix.target }}' == *'-dragonfly' ]]; then
             declare -r VENTI_TAG="$(jq --raw-output '.tag_name' <<< "$(curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --url 'https://api.github.com/repos/AmanoTeam/Venti/releases/latest')")"
             declare -r VENTI_TARBALL='/tmp/toolchain.tar.xz'
@@ -256,11 +237,11 @@ jobs:
         uses: softprops/action-gh-release@master
         with:
           tag_name: gcc-15
-          name: GCC 15.2.0
+          name: GCC 15.2.1
           files: ./*/*-unknown-*.tar.xz*
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
-          body: "* Update to GCC 15.2.0"
+          body: "* Update to GCC 15.2.1"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
