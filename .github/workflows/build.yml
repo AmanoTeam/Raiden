@@ -13,6 +13,9 @@ jobs:
     - uses: actions/checkout@main
       with:
         submodules: true
+    - name: Checkout submodules
+      run: |
+        git -C submodules/nz submodule update --init --depth=1
     - name: Check for cache
       id: check-cache
       uses: actions/cache@main
@@ -102,6 +105,9 @@ jobs:
     - uses: actions/checkout@main
       with:
         submodules: true
+    - name: Checkout submodules
+      run: |
+        git -C submodules/nz submodule update --init --depth=1
     - name: Free up some space
       run: |
         curl 'https://raw.githubusercontent.com/AmanoTeam/gha-free-space/refs/heads/master/main.sh' -sSf | bash 
