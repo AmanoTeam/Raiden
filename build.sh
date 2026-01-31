@@ -52,6 +52,10 @@ declare -ra targets=(
 	# 'aarch64-unknown-linux-musl'
 )
 
+declare -r gcc_wrapper="/tmp/gcc-wrapper"
+declare -r binutils_wrapper="/tmp/binutils-gnu-wrapper"
+declare -r clang_wrapper="/tmp/clang-wrapper"
+
 declare -r PKG_CONFIG_PATH="${toolchain_directory}/lib/pkgconfig"
 declare -r PKG_CONFIG_LIBDIR="${PKG_CONFIG_PATH}"
 declare -r PKG_CONFIG_SYSROOT_DIR="${toolchain_directory}"
@@ -457,6 +461,26 @@ if [[ "${CROSS_COMPILE_TRIPLET}" = *'-haiku' ]]; then
 	export ac_cv_c_bigendian='no'
 fi
 
+make \
+	-C "${workdir}/submodules/obggcc/tools/gcc-wrapper" \
+	PREFIX="$(dirname "${gcc_wrapper}")" \
+	CFLAGS="-D WCLANG ${ccflags}" \
+	CXXFLAGS="${ccflags}" \
+	LDFLAGS="${linkflags}"  \
+	FLAVOR='RAIDEN' \
+	gcc
+
+cp "${gcc_wrapper}" "${clang_wrapper}"
+
+make \
+	-C "${workdir}/submodules/obggcc/tools/gcc-wrapper" \
+	PREFIX="$(dirname "${gcc_wrapper}")" \
+	CFLAGS="${ccflags}" \
+	CXXFLAGS="${ccflags}" \
+	LDFLAGS="${linkflags}" \
+	FLAVOR='RAIDEN' \
+	gcc
+
 for target in "${targets[@]}"; do
 	source "${workdir}/${target}.sh"
 	
@@ -647,6 +671,13 @@ for target in "${targets[@]}"; do
 		--force \
 		"${toolchain_directory}/libexec/gcc/${triplet}/${gcc_major}/liblto_plugin.so" \
 		"${toolchain_directory}/lib/bfd-plugins"
+	
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-gcc"
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-g++"
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-c++"
+	
+	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-clang"
+	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-clang++"
 done
 
 # Delete libtool files and other unnecessary files GCC installs
@@ -655,7 +686,9 @@ rm \
 	--recursive \
 	"${toolchain_directory}/share" \
 	"${toolchain_directory}/lib/lib"*'.a' \
-	"${toolchain_directory}/include"
+	"${toolchain_directory}/include" \
+	"${toolchain_directory}/lib/pkgconfig" \
+	"${toolchain_directory}/lib/cmake"
 
 find \
 	"${toolchain_directory}" \
