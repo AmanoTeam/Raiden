@@ -776,13 +776,13 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	
 	declare soname=''
 	
-	if [[ "${host}" != *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" != *'-mingw32' ]]; then
 		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
-	if [[ "${host}" = *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
 	fi
 	
@@ -802,7 +802,7 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		declare name=$(realpath $("${cc}" --print-file-name="libgcc_s${dll}"))
 	fi
 	
-	if [[ "${host}" = *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		if ! [ -f "${name}" ]; then
 			# libgcc_s_seh
 			declare name=$(realpath $("${cc}" --print-file-name="libgcc_s_seh${dll}"))
@@ -814,13 +814,13 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		fi
 	fi
 	
-	if [[ "${host}" != *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" != *'-mingw32' ]]; then
 		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
-	if [[ "${host}" = *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
 	fi
 	
@@ -835,13 +835,13 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	# libatomic
 	declare name=$(realpath $("${cc}" --print-file-name="libatomic${dll}"))
 	
-	if [[ "${host}" != *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" != *'-mingw32' ]]; then
 		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
-	if [[ "${host}" = *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
 	fi
 	
@@ -857,13 +857,13 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	declare name=$(realpath $("${cc}" --print-file-name="libiconv${dll}"))
 	
 	if [ -f "${name}" ]; then
-		if [[ "${host}" != *'-mingw32' ]]; then
+		if [[ "${CROSS_COMPILE_TRIPLET}" != *'-mingw32' ]]; then
 			soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 		fi
 		
 		cp "${name}" "${toolchain_directory}/lib/${soname}"
 		
-		if [[ "${host}" = *'-mingw32' ]]; then
+		if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 			cp "${name}" "${toolchain_directory}/bin/${soname}"
 		fi
 		
@@ -880,13 +880,13 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	declare name=$(realpath $("${cc}" --print-file-name="libcharset${dll}"))
 	
 	if [ -f "${name}" ]; then
-		if [[ "${host}" != *'-mingw32' ]]; then
+		if [[ "${CROSS_COMPILE_TRIPLET}" != *'-mingw32' ]]; then
 			soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
 		fi
 		
 		cp "${name}" "${toolchain_directory}/lib/${soname}"
 		
-		if [[ "${host}" = *'-mingw32' ]]; then
+		if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 			cp "${name}" "${toolchain_directory}/bin/${soname}"
 		fi
 		
@@ -899,7 +899,7 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		fi
 	fi
 	
-	if [[ "${host}" = *'-mingw32' ]]; then
+	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		for target in "${targets[@]}"; do
 			for source in "${toolchain_directory}/"{bin,lib}"/lib"*'.dll'; do
 				cp "${source}" "${toolchain_directory}/libexec/gcc/${target}/${gcc_major}"
