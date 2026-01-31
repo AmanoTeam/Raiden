@@ -58,7 +58,7 @@ declare -ra targets=(
 declare -r gcc_wrapper='/tmp/gcc-wrapper'
 declare -r clang_wrapper='/tmp/clang-wrapper'
 
-declare build_nz='0'
+declare build_nz='1'
 
 declare exe=''
 declare dll='.so'
