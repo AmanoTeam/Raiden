@@ -724,7 +724,7 @@ for target in "${targets[@]}"; do
 		
 		mkdir --parent './nouzen/etc/nouzen/sources.list'
 		
-		echo -e "repository = ${repository}\nrelease = ${release}\nresource = ${resource}\narchitecture = ${architecture}" > './nouzen/etc/nouzen/sources.list/raiden.conf'
+		echo -e "repository = ${repository}\nrelease = ${release}\nresource = ${resource}\narchitecture = ${architecture}\nformat = ${format}" > './nouzen/etc/nouzen/sources.list/raiden.conf'
 		
 		cd '../bin'
 		
@@ -732,9 +732,9 @@ for target in "${targets[@]}"; do
 		
 		cd "${toolchain_directory}/bin"
 		
-		ln --symbolic "../${triplet}${musl_version}/bin/nz" "./${triplet}${musl_version}-nz"
-		ln --symbolic "../${triplet}${musl_version}/bin/apt" "./${triplet}${musl_version}-apt"
-		ln --symbolic "../${triplet}${musl_version}/bin/apt-get" "./${triplet}${musl_version}-apt-get"
+		ln --symbolic "../${triplet}${musl_version}/bin/nz" "./${triplet}-nz"
+		ln --symbolic "../${triplet}${musl_version}/bin/apt" "./${triplet}-apt"
+		ln --symbolic "../${triplet}${musl_version}/bin/apt-get" "./${triplet}-apt-get"
 	fi
 done
 
@@ -786,14 +786,6 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
 	fi
 	
-	if (( build_nz )); then
-		ln \
-			--symbolic \
-			--relative \
-			"${toolchain_directory}/lib/${soname}" \
-			"${toolchain_directory}/lib/nouzen"
-	fi
-	
 	# libegcc
 	declare name=$(realpath $("${cc}" --print-file-name="libegcc${dll}"))
 	
@@ -824,14 +816,6 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
 	fi
 	
-	if (( build_nz )); then
-		ln \
-			--symbolic \
-			--relative \
-			"${toolchain_directory}/lib/${soname}" \
-			"${toolchain_directory}/lib/nouzen"
-	fi
-	
 	# libatomic
 	declare name=$(realpath $("${cc}" --print-file-name="libatomic${dll}"))
 	
@@ -843,14 +827,6 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	
 	if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 		cp "${name}" "${toolchain_directory}/bin/${soname}"
-	fi
-	
-	if (( build_nz )); then
-		ln \
-			--symbolic \
-			--relative \
-			"${toolchain_directory}/lib/${soname}" \
-			"${toolchain_directory}/lib/nouzen"
 	fi
 	
 	# libiconv
@@ -866,14 +842,6 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 			cp "${name}" "${toolchain_directory}/bin/${soname}"
 		fi
-		
-		if (( build_nz )); then
-			ln \
-				--symbolic \
-				--relative \
-				"${toolchain_directory}/lib/${soname}" \
-				"${toolchain_directory}/lib/nouzen"
-		fi
 	fi
 	
 	# libcharset
@@ -888,14 +856,6 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 		
 		if [[ "${CROSS_COMPILE_TRIPLET}" = *'-mingw32' ]]; then
 			cp "${name}" "${toolchain_directory}/bin/${soname}"
-		fi
-		
-		if (( build_nz )); then
-			ln \
-				--symbolic \
-				--relative \
-				"${toolchain_directory}/lib/${soname}" \
-				"${toolchain_directory}/lib/nouzen"
 		fi
 	fi
 	
