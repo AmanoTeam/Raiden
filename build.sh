@@ -726,10 +726,7 @@ for target in "${targets[@]}"; do
 		
 		echo -e "repository = ${repository}\nrelease = ${release}\nresource = ${resource}\narchitecture = ${architecture}" > './nouzen/etc/nouzen/sources.list/raiden.conf'
 		
-		cd '../'
-		
-		mkdir 'bin'
-		cd 'bin'
+		cd '../bin'
 		
 		ln --symbolic '../lib/nouzen/bin/'* .
 		
