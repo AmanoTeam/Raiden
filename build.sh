@@ -37,6 +37,9 @@ declare -r zlib_directory='/tmp/zlib-develop'
 declare -r zstd_tarball='/tmp/zstd.tar.gz'
 declare -r zstd_directory='/tmp/zstd-dev'
 
+declare -r nz_directory="${workdir}/submodules/nz"
+declare -r nz_prefix='/tmp/nz'
+
 declare -r sysroot_tarball='/tmp/sysroot.tar.xz'
 
 declare -r max_jobs='30'
@@ -52,9 +55,15 @@ declare -ra targets=(
 	# 'aarch64-unknown-linux-musl'
 )
 
-declare -r gcc_wrapper="/tmp/gcc-wrapper"
-declare -r binutils_wrapper="/tmp/binutils-gnu-wrapper"
-declare -r clang_wrapper="/tmp/clang-wrapper"
+declare -r gcc_wrapper='/tmp/gcc-wrapper'
+declare -r clang_wrapper='/tmp/clang-wrapper'
+
+declare build_nz='0'
+
+declare exe=''
+declare dll='.so'
+
+declare musl_version='1.2'
 
 declare -r PKG_CONFIG_PATH="${toolchain_directory}/lib/pkgconfig"
 declare -r PKG_CONFIG_LIBDIR="${PKG_CONFIG_PATH}"
@@ -442,6 +451,27 @@ cmake \
 cmake --build "${PWD}"
 cmake --install "${PWD}" --strip
 
+if (( build_nz )); then
+	[ -d "${nz_directory}/build" ] || mkdir "${nz_directory}/build"
+	
+	cd "${nz_directory}/build"
+	rm --force --recursive ./*
+	
+	cmake \
+		-S "${nz_directory}" \
+		-B "${PWD}" \
+		-DCMAKE_C_FLAGS="${ccflags}" \
+		-DCMAKE_CXX_FLAGS="${ccflags}" \
+		-DCMAKE_INSTALL_PREFIX="${nz_prefix}"
+	
+	cmake --build "${PWD}" -- --jobs='1'
+	cmake --install "${PWD}" --strip
+	
+	mkdir --parent "${toolchain_directory}/lib/nouzen"
+	mv "${nz_prefix}/lib/"* "${toolchain_directory}/lib/nouzen"
+	rmdir "${nz_prefix}/lib"
+fi
+
 # We prefer symbolic links over hard links.
 cp "${workdir}/submodules/obggcc/tools/ln.sh" '/tmp/ln'
 
@@ -506,7 +536,7 @@ for target in "${targets[@]}"; do
 		--symbolic \
 		--relative \
 		"${toolchain_directory}/${triplet}" \
-		"${toolchain_directory}/${triplet}1.2"
+		"${toolchain_directory}/${triplet}${musl_version}"
 	
 	[ -d "${binutils_directory}/build" ] || mkdir "${binutils_directory}/build"
 	
@@ -672,12 +702,43 @@ for target in "${targets[@]}"; do
 		"${toolchain_directory}/libexec/gcc/${triplet}/${gcc_major}/liblto_plugin.so" \
 		"${toolchain_directory}/lib/bfd-plugins"
 	
-	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-gcc"
-	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-g++"
-	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-c++"
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-gcc"
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-g++"
+	cp "${gcc_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-c++"
 	
-	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-clang"
-	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}1.2-clang++"
+	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang"
+	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang++"
+	
+	if (( build_nz )); then
+		mkdir 'nouzen'
+		
+		cp --recursive "${nz_prefix}/"* "${PWD}/nouzen"
+		
+		mkdir --parent "${PWD}/nouzen/lib"
+		
+		ln \
+			--symbolic \
+			--relative \
+			"${toolchain_directory}/lib/nouzen/lib"* \
+			"${PWD}/nouzen/lib"
+		
+		mkdir --parent './nouzen/etc/nouzen/sources.list'
+		
+		echo -e "repository = ${repository}\nrelease = ${release}\nresource = ${resource}\narchitecture = ${architecture}" > './nouzen/etc/nouzen/sources.list/raiden.conf'
+		
+		cd '../'
+		
+		mkdir 'bin'
+		cd 'bin'
+		
+		ln --symbolic '../lib/nouzen/bin/'* .
+		
+		cd "${toolchain_directory}/bin"
+		
+		ln --symbolic "../${triplet}${musl_version}/bin/nz" "./${triplet}${musl_version}-nz"
+		ln --symbolic "../${triplet}${musl_version}/bin/apt" "./${triplet}${musl_version}-apt"
+		ln --symbolic "../${triplet}${musl_version}/bin/apt-get" "./${triplet}${musl_version}-apt-get"
+	fi
 done
 
 # Delete libtool files and other unnecessary files GCC installs
@@ -709,50 +770,146 @@ if ! (( is_native )) && [[ "${CROSS_COMPILE_TRIPLET}" != *'-darwin'* ]]; then
 	[ -d "${toolchain_directory}/lib" ] || mkdir "${toolchain_directory}/lib"
 	
 	# libestdc++
-	declare name=$(realpath $("${cc}" --print-file-name='libestdc++.so'))
+	declare name=$(realpath $("${cc}" --print-file-name="libestdc++${dll}"))
 	
 	# libstdc++
 	if ! [ -f "${name}" ]; then
-		declare name=$(realpath $("${cc}" --print-file-name='libstdc++.so'))
+		declare name=$(realpath $("${cc}" --print-file-name="libstdc++${dll}"))
 	fi
 	
-	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	declare soname=''
+	
+	if [[ "${host}" != *'-mingw32' ]]; then
+		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
+	if [[ "${host}" = *'-mingw32' ]]; then
+		cp "${name}" "${toolchain_directory}/bin/${soname}"
+	fi
+	
+	if (( build_nz )); then
+		ln \
+			--symbolic \
+			--relative \
+			"${toolchain_directory}/lib/${soname}" \
+			"${toolchain_directory}/lib/nouzen"
+	fi
+	
 	# libegcc
-	declare name=$(realpath $("${cc}" --print-file-name='libegcc.so'))
+	declare name=$(realpath $("${cc}" --print-file-name="libegcc${dll}"))
 	
 	if ! [ -f "${name}" ]; then
 		# libgcc_s
-		declare name=$(realpath $("${cc}" --print-file-name='libgcc_s.so.1'))
+		declare name=$(realpath $("${cc}" --print-file-name="libgcc_s${dll}"))
 	fi
 	
-	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	if [[ "${host}" = *'-mingw32' ]]; then
+		if ! [ -f "${name}" ]; then
+			# libgcc_s_seh
+			declare name=$(realpath $("${cc}" --print-file-name="libgcc_s_seh${dll}"))
+		fi
+		
+		if ! [ -f "${name}" ]; then
+			# libgcc_s_sjlj
+			declare name=$(realpath $("${cc}" --print-file-name="libgcc_s_sjlj${dll}"))
+		fi
+	fi
+	
+	if [[ "${host}" != *'-mingw32' ]]; then
+		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
+	
+	if [[ "${host}" = *'-mingw32' ]]; then
+		cp "${name}" "${toolchain_directory}/bin/${soname}"
+	fi
+	
+	if (( build_nz )); then
+		ln \
+			--symbolic \
+			--relative \
+			"${toolchain_directory}/lib/${soname}" \
+			"${toolchain_directory}/lib/nouzen"
+	fi
 	
 	# libatomic
-	declare name=$(realpath $("${cc}" --print-file-name='libatomic.so'))
+	declare name=$(realpath $("${cc}" --print-file-name="libatomic${dll}"))
 	
-	declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	if [[ "${host}" != *'-mingw32' ]]; then
+		soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+	fi
 	
 	cp "${name}" "${toolchain_directory}/lib/${soname}"
 	
+	if [[ "${host}" = *'-mingw32' ]]; then
+		cp "${name}" "${toolchain_directory}/bin/${soname}"
+	fi
+	
+	if (( build_nz )); then
+		ln \
+			--symbolic \
+			--relative \
+			"${toolchain_directory}/lib/${soname}" \
+			"${toolchain_directory}/lib/nouzen"
+	fi
+	
 	# libiconv
-	declare name=$(realpath $("${cc}" --print-file-name='libiconv.so'))
+	declare name=$(realpath $("${cc}" --print-file-name="libiconv${dll}"))
 	
 	if [ -f "${name}" ]; then
-		declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+		if [[ "${host}" != *'-mingw32' ]]; then
+			soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+		fi
+		
 		cp "${name}" "${toolchain_directory}/lib/${soname}"
+		
+		if [[ "${host}" = *'-mingw32' ]]; then
+			cp "${name}" "${toolchain_directory}/bin/${soname}"
+		fi
+		
+		if (( build_nz )); then
+			ln \
+				--symbolic \
+				--relative \
+				"${toolchain_directory}/lib/${soname}" \
+				"${toolchain_directory}/lib/nouzen"
+		fi
 	fi
 	
 	# libcharset
-	declare name=$(realpath $("${cc}" --print-file-name='libcharset.so'))
+	declare name=$(realpath $("${cc}" --print-file-name="libcharset${dll}"))
 	
 	if [ -f "${name}" ]; then
-		declare soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+		if [[ "${host}" != *'-mingw32' ]]; then
+			soname=$("${readelf}" -d "${name}" | grep 'SONAME' | sed --regexp-extended 's/.+\[(.+)\]/\1/g')
+		fi
+		
 		cp "${name}" "${toolchain_directory}/lib/${soname}"
+		
+		if [[ "${host}" = *'-mingw32' ]]; then
+			cp "${name}" "${toolchain_directory}/bin/${soname}"
+		fi
+		
+		if (( build_nz )); then
+			ln \
+				--symbolic \
+				--relative \
+				"${toolchain_directory}/lib/${soname}" \
+				"${toolchain_directory}/lib/nouzen"
+		fi
+	fi
+	
+	if [[ "${host}" = *'-mingw32' ]]; then
+		for target in "${targets[@]}"; do
+			for source in "${toolchain_directory}/"{bin,lib}"/lib"*'.dll'; do
+				cp "${source}" "${toolchain_directory}/libexec/gcc/${target}/${gcc_major}"
+			done
+		done
+		
+		rm "${toolchain_directory}/lib/lib"*'.'{dll,lib}
 	fi
 fi
 

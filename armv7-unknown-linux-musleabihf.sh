@@ -6,4 +6,7 @@ declare triplet='armv7l-unknown-linux-musleabihf'
 
 declare ld='ld-musl-armhf.so.1'
 
-declare os='void'
+repository='https://dl-cdn.alpinelinux.org/alpine/'
+release='edge'
+resource='main community'
+architecture='armv7'
