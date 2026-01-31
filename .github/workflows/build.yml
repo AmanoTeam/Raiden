@@ -13,11 +13,14 @@ jobs:
     - uses: actions/checkout@main
       with:
         submodules: true
+    - name: Checkout submodules
+      run: |
+        git -C submodules/nz submodule update --init --depth=1
     - name: Check for cache
       id: check-cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-4
         lookup-only: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -45,7 +48,7 @@ jobs:
       if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-4
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
           /tmp/x86_64-linux-gnu.tar.xz.sha256
@@ -102,17 +105,20 @@ jobs:
     - uses: actions/checkout@main
       with:
         submodules: true
+    - name: Checkout submodules
+      run: |
+        git -C submodules/nz submodule update --init --depth=1
     - name: Free up some space
       run: |
         curl 'https://raw.githubusercontent.com/AmanoTeam/gha-free-space/refs/heads/master/main.sh' -sSf | bash 
     - name: Install required dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install build-essential || true
+        sudo apt-get install build-essential
     - name: Restore from cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-4
         fail-on-cache-miss: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz

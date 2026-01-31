@@ -2,8 +2,10 @@
 
 declare extra_configure_flags='--with-arch=armv7-a --with-fpu=vfpv3 --with-float=hard'
 
-declare triplet='armv7l-unknown-linux-musleabihf'
+declare triplet='armv7-unknown-linux-musleabihf'
 
-declare ld='ld-musl-armhf.so.1'
-
-declare os='void'
+repository='https://dl-cdn.alpinelinux.org/alpine/'
+release='edge'
+resource='main community'
+architecture='armv7'
+format='apk'
