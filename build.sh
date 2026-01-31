@@ -45,16 +45,11 @@ declare -r ccflags='-w -O2'
 declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
-	'i386-unknown-linux-musl'
+	# 'i386-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
-	'armv6-unknown-linux-musleabihf'
-	'armv7-unknown-linux-musleabihf'
-	'aarch64-unknown-linux-musl'
-	# 'loongarch64-unknown-linux-musl'
-	# 'powerpc64le-unknown-linux-musl'
-	# 's390x-unknown-linux-musl'
-	# 'mips64-unknown-linux-musl'
-	# 'riscv64-unknown-linux-musl'
+	# 'armv6-unknown-linux-musleabihf'
+	# 'armv7-unknown-linux-musleabihf'
+	# 'aarch64-unknown-linux-musl'
 )
 
 declare -r PKG_CONFIG_PATH="${toolchain_directory}/lib/pkgconfig"
@@ -483,6 +478,12 @@ for target in "${targets[@]}"; do
 	
 	unlink "${sysroot_tarball}"
 	
+	ln \
+		--symbolic \
+		--relative \
+		"${toolchain_directory}/${triplet}" \
+		"${toolchain_directory}/${triplet}1.2"
+	
 	[ -d "${binutils_directory}/build" ] || mkdir "${binutils_directory}/build"
 	
 	cd "${binutils_directory}/build"
@@ -617,11 +618,35 @@ for target in "${targets[@]}"; do
 	
 	[ -f './libiberty.a' ] && unlink './libiberty.a'
 	
-	cd "${toolchain_directory}/lib/bfd-plugins"
+	ln \
+		--symbolic \
+		--relative \
+		"${toolchain_directory}/lib/gcc/${triplet}/${gcc_major}/"*'.'{a,o} \
+		'./'
 	
-	if ! [ -f './liblto_plugin.so' ]; then
-		ln --symbolic "../../libexec/gcc/${triplet}/"*'/liblto_plugin.so' './'
-	fi
+	declare gcc_include_dir="${toolchain_directory}/lib/gcc/${triplet}/${gcc_major}/include"
+	declare clang_include_dir="${gcc_include_dir}/clang"
+	
+	mkdir "${clang_include_dir}"
+	
+	ln \
+		--symbolic \
+		--relative \
+		"${gcc_include_dir}/"*'.h' \
+		"${clang_include_dir}"
+	
+	rm \
+		--force \
+		"${clang_include_dir}/"*'intrin'*'.h' \
+		"${clang_include_dir}/arm"*'.h' \
+		"${clang_include_dir}/stdatomic.h"
+	
+	ln \
+		--symbolic \
+		--relative \
+		--force \
+		"${toolchain_directory}/libexec/gcc/${triplet}/${gcc_major}/liblto_plugin.so" \
+		"${toolchain_directory}/lib/bfd-plugins"
 done
 
 # Delete libtool files and other unnecessary files GCC installs
