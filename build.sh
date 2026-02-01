@@ -48,11 +48,11 @@ declare -r ccflags='-w -O2'
 declare -r linkflags='-Xlinker -s'
 
 declare -ra targets=(
-	# 'i386-unknown-linux-musl'
+	'i386-unknown-linux-musl'
 	'x86_64-unknown-linux-musl'
-	# 'armv6-unknown-linux-musleabihf'
-	# 'armv7-unknown-linux-musleabihf'
-	# 'aarch64-unknown-linux-musl'
+	'armv6-unknown-linux-musleabihf'
+	'armv7-unknown-linux-musleabihf'
+	'aarch64-unknown-linux-musl'
 )
 
 declare -r gcc_wrapper='/tmp/gcc-wrapper'
@@ -708,6 +708,20 @@ for target in "${targets[@]}"; do
 	
 	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang"
 	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang++"
+	
+	ln \
+		--symbolic \
+		--relative \
+		--force \
+		"${toolchain_directory}/bin/${triplet}${musl_version}-clang" \
+		"${toolchain_directory}/bin/${triplet}-clang"
+	
+	ln \
+		--symbolic \
+		--relative \
+		--force \
+		"${toolchain_directory}/bin/${triplet}${musl_version}-clang++" \
+		"${toolchain_directory}/bin/${triplet}-clang++"
 	
 	cp "${workdir}/submodules/obggcc/tools/pkg-config.sh" "${toolchain_directory}/bin/${triplet}-pkg-config"
 	sed --in-place 's/OBGGCC/RAIDEN/g' "${toolchain_directory}/bin/${triplet}-pkg-config"
