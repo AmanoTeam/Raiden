@@ -709,6 +709,9 @@ for target in "${targets[@]}"; do
 	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang"
 	cp "${clang_wrapper}" "${toolchain_directory}/bin/${triplet}${musl_version}-clang++"
 	
+	cp "${workdir}/submodules/obggcc/tools/pkg-config.sh" "${toolchain_directory}/bin/${triplet}-pkg-config"
+	sed --in-place 's/OBGGCC/RAIDEN/g' "${toolchain_directory}/bin/${triplet}-pkg-config"
+	
 	if (( build_nz )); then
 		mkdir 'nouzen'
 		
