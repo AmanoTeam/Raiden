@@ -20,7 +20,7 @@ jobs:
       id: check-cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-2
         lookup-only: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
@@ -48,7 +48,7 @@ jobs:
       if: ${{ steps.check-cache.outputs.cache-hit != 'true' }}
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-2
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
           /tmp/x86_64-linux-gnu.tar.xz.sha256
@@ -114,11 +114,11 @@ jobs:
     - name: Install required dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install build-essential || true
+        sudo apt-get install build-essential
     - name: Restore from cache
       uses: actions/cache@main
       with:
-        key: gcc-15.2.1-1
+        key: gcc-15.2.1-2
         fail-on-cache-miss: true
         path: |
           /tmp/x86_64-linux-gnu.tar.xz
