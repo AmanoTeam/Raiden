@@ -605,7 +605,6 @@ for target in "${targets[@]}"; do
 		--enable-clocale='gnu' \
 		--enable-default-pie \
 		--enable-default-ssp \
-		--enable-gnu-indirect-function \
 		--enable-libstdcxx-backtrace \
 		--enable-libstdcxx-filesystem-ts \
 		--enable-libstdcxx-static-eh-pool \
@@ -632,17 +631,16 @@ for target in "${targets[@]}"; do
 		--with-gnu-as \
 		--with-gnu-ld \
 		--disable-gnu-unique-object \
+		--disable-gnu-indirect-function \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-symvers \
 		--disable-multilib \
-		--disable-werror \
 		--disable-bootstrap \
 		--disable-libstdcxx-pch \
 		--disable-nls \
 		--disable-canonical-system-headers \
 		--disable-libstdcxx-verbose \
-		--without-headers \
 		--without-static-standard-libraries \
 		${extra_configure_flags} \
 		CFLAGS="${ccflags}" \
