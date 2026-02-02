@@ -606,7 +606,6 @@ for target in "${targets[@]}"; do
 		--enable-default-pie \
 		--enable-default-ssp \
 		--enable-gnu-indirect-function \
-		--disable-gnu-unique-object \
 		--enable-libstdcxx-backtrace \
 		--enable-libstdcxx-filesystem-ts \
 		--enable-libstdcxx-static-eh-pool \
@@ -624,12 +623,15 @@ for target in "${targets[@]}"; do
 		--enable-languages='c,c++' \
 		--enable-plugin \
 		--enable-libstdcxx-time='yes' \
-		--enable-cxx-flags="${linkflags}" \
 		--enable-host-pie \
 		--enable-host-shared \
 		--enable-libgomp \
 		--enable-tls \
+		--with-specs='%{!Qy: -Qn}' \
 		--with-pic \
+		--with-gnu-as \
+		--with-gnu-ld \
+		--disable-gnu-unique-object \
 		--disable-libsanitizer \
 		--disable-fixincludes \
 		--disable-symvers \
@@ -638,6 +640,8 @@ for target in "${targets[@]}"; do
 		--disable-bootstrap \
 		--disable-libstdcxx-pch \
 		--disable-nls \
+		--disable-canonical-system-headers \
+		--disable-libstdcxx-verbose \
 		--without-headers \
 		--without-static-standard-libraries \
 		${extra_configure_flags} \
