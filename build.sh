@@ -745,9 +745,9 @@ for target in "${targets[@]}"; do
 		
 		cd "${toolchain_directory}/bin"
 		
-		ln --symbolic "../${triplet}${musl_version}/bin/nz" "./${triplet}-nz"
-		ln --symbolic "../${triplet}${musl_version}/bin/apt" "./${triplet}-apt"
-		ln --symbolic "../${triplet}${musl_version}/bin/apt-get" "./${triplet}-apt-get"
+		ln --symbolic "../${triplet}/bin/nz" "./${triplet}-nz"
+		ln --symbolic "../${triplet}/bin/apt" "./${triplet}-apt"
+		ln --symbolic "../${triplet}/bin/apt-get" "./${triplet}-apt-get"
 	fi
 done
 
