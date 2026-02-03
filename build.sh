@@ -532,12 +532,6 @@ for target in "${targets[@]}"; do
 	
 	unlink "${sysroot_tarball}"
 	
-	ln \
-		--symbolic \
-		--relative \
-		"${toolchain_directory}/${triplet}" \
-		"${toolchain_directory}/${triplet}${musl_version}"
-	
 	[ -d "${binutils_directory}/build" ] || mkdir "${binutils_directory}/build"
 	
 	cd "${binutils_directory}/build"
