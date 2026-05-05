@@ -2,7 +2,7 @@
 
 set -eu
 
-declare -r RAIDEN_HOME='/tmp/raiden-toolchain'
+declare -r RAIDEN_HOME='/tmp/musl-gcc-cross-toolchain'
 
 if [ -d "${RAIDEN_HOME}" ]; then
 	PATH+=":${RAIDEN_HOME}/bin"
@@ -12,7 +12,7 @@ if [ -d "${RAIDEN_HOME}" ]; then
 fi
 
 declare -r RAIDEN_CROSS_TAG="$(jq --raw-output '.tag_name' <<< "$(curl --retry 10 --retry-delay 3 --silent --url 'https://api.github.com/repos/AmanoTeam/Raiden/releases/latest')")"
-declare -r RAIDEN_CROSS_TARBALL='/tmp/raiden.tar.xz'
+declare -r RAIDEN_CROSS_TARBALL='/tmp/musl-gcc-cross.tar.xz'
 declare -r RAIDEN_CROSS_URL="https://github.com/AmanoTeam/Raiden/releases/download/${RAIDEN_CROSS_TAG}/x86_64-unknown-linux-gnu.tar.xz"
 
 curl --connect-timeout '10' --retry '15' --retry-all-errors --fail --silent --location --url "${RAIDEN_CROSS_URL}" --output "${RAIDEN_CROSS_TARBALL}"
@@ -20,7 +20,7 @@ tar --directory="$(dirname "${RAIDEN_CROSS_TARBALL}")" --extract --file="${RAIDE
 
 rm "${RAIDEN_CROSS_TARBALL}"
 
-mv '/tmp/raiden' "${RAIDEN_HOME}"
+mv '/tmp/musl-gcc-cross' "${RAIDEN_HOME}"
 
 PATH+=":${RAIDEN_HOME}/bin"
 
