@@ -108,6 +108,10 @@ jobs:
     - name: Checkout submodules
       run: |
         git -C submodules/nz submodule update --init --depth=1
+    - name: Install required dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install build-essential autoconf libtool zsh
     - name: Restore from cache
       uses: actions/cache@main
       with:
