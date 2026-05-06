@@ -629,6 +629,7 @@ for target in "${targets[@]}"; do
 		--enable-host-shared \
 		--enable-libgomp \
 		--enable-tls \
+		--enable-libstdcxx-verbose \
 		--with-specs='%{!Qy: -Qn}' \
 		--with-pic \
 		--with-gnu-as \
@@ -639,11 +640,8 @@ for target in "${targets[@]}"; do
 		--disable-fixincludes \
 		--disable-symvers \
 		--disable-multilib \
-		--disable-bootstrap \
-		--disable-libstdcxx-pch \
 		--disable-nls \
 		--disable-canonical-system-headers \
-		--disable-libstdcxx-verbose \
 		--without-static-standard-libraries \
 		${extra_configure_flags} \
 		CFLAGS="${ccflags}" \
@@ -663,7 +661,7 @@ for target in "${targets[@]}"; do
 		all --jobs="${max_jobs}"
 	make install
 	
-	cat "${workdir}/submodules/obggcc/patches/c++config.h" >> "${toolchain_directory}/${triplet}/include/c++/${gcc_major}/${triplet}/bits/c++config.h"
+	# cat "${workdir}/submodules/obggcc/patches/c++config.h" >> "${toolchain_directory}/${triplet}/include/c++/${gcc_major}/${triplet}/bits/c++config.h"
 	
 	rm "${toolchain_directory}/bin/${triplet}-${triplet}-"* || true
 	
